@@ -57,7 +57,7 @@ def _plot_latent_prediction(axis, latent_idx, merged_history: Timeline):
         times_pred, (pred_locs, pred_stds) = prediction.select_features(['pred_locs', 'pred_stds'])
         pred_locs, pred_stds = torch.stack(pred_locs)[:, latent_idx], torch.stack(pred_stds)[:, latent_idx]  # convert to tensor and select latent dimension i
         axis.fill_between(times_pred, pred_locs - pred_stds, pred_locs + pred_stds, color='k', alpha=0.1, linewidth=1)
-        axis.plot(times_pred, pred_locs, 'k--', alpha=0.7, linewidth=0.3, label='Perceived latent' if j == 1 else None)
+        axis.plot(times_pred, pred_locs, 'k--', alpha=0.7, linewidth=0.3, label='Predicted latent' if j == 1 else None)
 
     # 2) plot expected latents
     times_expectations, (expected_locs, expected_stds) = merged_history.select_features(['expected_locs', 'expected_stds'])
@@ -97,11 +97,25 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
     cbar.set_label('KL extr.')
 
     # 2) Plot trajectories
-    perceived_observations = torch.stack(agent.logged_history.select_features('perceived_observations')[1])
     true_observations = torch.stack(episode_history.select_features('true_observations')[1])
     axis.plot(true_observations[:, 0], true_observations[:, 1], color=(0.5, 0.5, 1.0), linewidth=1.5)
-    axis.plot(perceived_observations[:, 0], perceived_observations[:, 1], color=(0.0, 1.0, 0.0), linestyle='--', linewidth=1.5)
     axis.scatter([true_observations[0, 0]], [true_observations[0, 1]], color='r')
+
+    perceived_locs = agent.logged_history.select_features('perceived_locs')[1]
+    if len(perceived_locs) > 1:  # Skip if no planning done yet
+        perceived_locs = torch.stack(perceived_locs)
+        perceived_observations = agent.vae.decode(perceived_locs).detach()
+        axis.plot(perceived_observations[:, 0], perceived_observations[:, 1], color=(0.0, 1.0, 0.0), linestyle='--', linewidth=1.5)
+
+    # Plot predicted trajectories
+    times_predictions, predictions = agent.logged_history.select_features('predictions')
+    for j, prediction in enumerate(predictions):
+        _, pred_locs = prediction.select_features('pred_locs')
+        pred_locs = torch.stack(pred_locs)
+        perceived_locs = agent.logged_history.get_frame(times_predictions[j])['perceived_locs']
+        # pred_locs = torch.stack(pred_locs)
+        pred_obs = agent.vae.decode(torch.cat([perceived_locs.unsqueeze(0), pred_locs])).detach()
+        axis.plot(pred_obs[:, 0], pred_obs[:, 1], color=(0.0, 1.0, 0.0), alpha=0.5, linewidth=0.5, label='Perceived latent' if j == 1 else None)
 
     # 3) Plot goal box
     x1, y1 = observations_mapper(torch.tensor((0.45, 0.0)))  # thresholds for mountain-car goal, transformed to problem coordinates
@@ -111,6 +125,8 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
     axis.set_xlabel('Horizontal position')
     axis.set_ylabel('Velocity', labelpad=-3)
     axis.set_title('Phase portrait with extrinsic value')
+    axis.set_xlim([-1, 1])
+    axis.set_ylim([-1, 1])
     axis.grid(color=(0.5, 0.5, 0.5), alpha=0.5, linewidth=0.2)
     return axis
 
@@ -146,26 +162,28 @@ def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=
     all_rewards = []
     times = None
     for timeline in timelines:
-        times, rewards = timeline.select_features('rewards')
+        times, rewards = timeline.select_features('steps_per_episode')
         all_rewards.append(rewards)
-    all_rewards = torch.tensor(all_rewards)
+    all_rewards = torch.tensor(all_rewards, dtype=torch.float32)
 
     r_mean = all_rewards.mean(0)
-    r_max = all_rewards.max(0)[0]
-    r_min = all_rewards.min(0)[0]
+    r_max = r_mean + all_rewards.std(0) # all_rewards.max(0)[0]
+    r_min = [max(a, b) for a, b in zip(r_mean - all_rewards.std(0), all_rewards.min(0)[0])]
 
     fig = figure or plt.figure(figsize=(6, 4))
     ax = fig.gca()
     if len(all_rewards) > 1:
         ax.fill_between(times, r_min, r_max, color=(0.2, 0.4, 1.0), linewidth=0, alpha=0.5)
     ax.plot(times, r_mean, color=(0.2, 0.4, 1.0), label=label)
-    ax.set_ylim((-100, 100.0))
+    ax.axhline(200, color='k', linestyle='--', linewidth=0.5)
+    ax.set_yticks([0, min(r_min), 200, 400, 600, 800, 1000])
+    ax.set_ylim((0, 1000.0))
 
     if figure is None:
         plt.grid(linewidth=0.4, alpha=0.5)
-        plt.suptitle(f'Min and max and average of {len(timelines)} runs', y=0.94)
+        plt.suptitle(f'Mountain car. Statistics of {len(timelines)} agents', y=0.94)
         plt.xlabel('Episodes')
-        plt.ylabel('Reward')
+        plt.ylabel('Steps until goal')
         if os.path.exists(os.path.dirname(save_path)):
             plt.savefig(save_path, )
         if show:
@@ -192,8 +210,9 @@ def make_video_frame(agent: ActiveInferenceCapsule, episode_history: Timeline, r
     ax_frame.get_yaxis().set_visible(False)
 
     ax_action = _plot_observations_actions(ax_action, agent, episode_history.merge(agent.logged_history))
-    ax_action.set_xlim((0, 200))
+    ax_action.set_xlim((0, 1000))
     fig.tight_layout()
+
     # plt.show()
     return fig
 

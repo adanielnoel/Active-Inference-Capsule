@@ -17,37 +17,44 @@ class PredictorGRU(nn.Module):
         policy_dim: number of dimensions of the policy space
         dynamic_dim: number of dimensions of the dynamic states (i.e., hidden states of the `RNN`)
         num_rnn_layers: number of RNN layers
-        post_dist: type of posterior distribution over hidden states. Should be equal to the one for q_x_y. Defaults to `Normal`.
     """
 
-    def __init__(self, latent_dim: int, policy_dim: int, dynamic_dim: int, num_rnn_layers: int, post_dist: Type[Distribution] = distr.Normal):
+    def __init__(self, latent_dim: int, policy_dim: int, dynamic_dim: int, num_rnn_layers: int):
         super(PredictorGRU, self).__init__()
-        self.post_dist = post_dist
         self.latent_dim = latent_dim
         self.policy_dim = policy_dim
         self.dynamic_dim = dynamic_dim
         self.num_rnn_layers = num_rnn_layers
 
         # Neural networks:
-        self.gru = nn.GRU(latent_dim + policy_dim, dynamic_dim, num_layers=num_rnn_layers, dropout=0.05 if num_rnn_layers > 1 else 0)
+        self.gru = nn.GRU(input_size=latent_dim + policy_dim, hidden_size=dynamic_dim, num_layers=num_rnn_layers, dropout=0.05 if num_rnn_layers > 1 else 0)
         self.mu = nn.Linear(dynamic_dim, latent_dim)
         self.scale = nn.Linear(dynamic_dim, latent_dim)
         self.optimizer = optim.Adam(self.parameters(), lr=0.001)
 
+        # States
+        self.dyn_state = None  # Latest dynamical states
+        self.last_latent = None # Latent state that was used to compute the dynamic states
+        self.reset_states()
+
+    def reset_states(self):
+        self.dyn_state = torch.zeros((self.num_rnn_layers, 1, self.dynamic_dim))
+        self.last_latent = torch.zeros((1, 1, self.latent_dim))
+
     def forward(self, x: torch.Tensor, policy: torch.Tensor, dyn: torch.Tensor = None):
         """
         Predicts the latent state one time-step ahead
-        :param x: [sequence_length, 1, latent_dim]
-        :param policy: [sequence_length, 1, policy_dim]
-        :param dyn: An initial dynamic state (e.g., from the previous call). Shape: [num_rnn_layers, 1, dynamic_dim]
+        :param x: [sequence_length, n_policies, latent_dim]
+        :param policy: [sequence_length, n_policies, policy_dim]
+        :param dyn: An initial dynamic state (e.g., from the previous call). Shape: [num_rnn_layers, n_policies, dynamic_dim]
         :return: the mean and variance of the density of the predicted latent, and the dynamic state
         """
         pred, dyn = self.gru(torch.cat((x, policy), dim=2), dyn)
         return self.mu(pred) + x, nn.functional.softplus(self.scale(pred)) + 1e-6, dyn
 
-    def predict(self, policy: torch.Tensor, dyn, first_latent):
+    def predict(self, policy: torch.Tensor, first_latent: torch.Tensor):
         """
-        Predicts the latent state several time-steps ahead under the provided policy
+        Predicts the latent state several time-steps ahead from the first_latent under the provided policy
 
         #TODO: fix doc after changes
         The following diagram shows the inputs to each step:
@@ -68,21 +75,30 @@ class PredictorGRU(nn.Module):
         next_mu = []
         next_var = []
 
-        if dyn.shape[1] == 1 != n_policies:  # If dyn state is not batched, use the same for each batch
-            dyn = dyn.expand((dyn.shape[0], n_policies, dyn.shape[2]))
-        if first_latent.shape[1] == 1 != n_policies:  # If first_latent state is not batched, use the same for each batch
-            first_latent = first_latent.expand((1, n_policies, first_latent.shape[2]))
+        # If policies are batched, use the same states for each batch
+        if n_policies == 1:
+            last_dyn = self.dyn_state
+            first_latent = first_latent
+        else:
+            last_dyn = self.dyn_state.expand((self.num_rnn_layers, n_policies, self.dynamic_dim))
+            first_latent = first_latent.expand((1, n_policies, self.latent_dim))
 
-        last_dyn = dyn
         for i in range(steps):
             _mu, _var, _dyn = self(first_latent if i == 0 else next_mu[i - 1], policy[[i]], last_dyn)
             next_mu.append(_mu)
             next_var.append(_var)
-            last_dyn = _dyn.clone().detach()  # do not backprop through the hidden state
+            last_dyn = _dyn.clone().detach()
 
         return torch.cat(next_mu), torch.cat(next_var)
 
     def perceive_policy_outcome(self, px_y: distr.Distribution, policy: torch.Tensor, dyn: torch.Tensor, first_latent: torch.Tensor):
+        """
+        Updates the dynamic state
+        :param px_y: a distribution over a sequence of latent states
+        :param policy: a sequence of actions preceding the observations
+        :param
+        """
+
         with profiler.record_function("Retrospection"):
             prior_latents = torch.cat((first_latent, px_y.mean[:-1].unsqueeze(1)), dim=0)  # A sequence of latents that are prior to performing the actions
             pred_latent_locs, pred_latent_scales, dyn = self(prior_latents, policy.unsqueeze(1), dyn)

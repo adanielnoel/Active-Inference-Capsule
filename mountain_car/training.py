@@ -2,11 +2,11 @@ import os
 import sys
 import pickle
 
-from tqdm import tqdm
-import numpy as np
 import gym
 import torch
 import torch.distributions as distr
+import numpy as np
+import tqdm
 
 from models.vae_dense_obs import DenseObservation_VAE
 from models.active_inference_capsule import ActiveInferenceCapsule
@@ -21,13 +21,14 @@ import mountain_car.plotting as plots
 
 def run_training(agent_parameters,              # Agent parameters
                  time_compression,              # Simulation parameter
-                 episodes,                      # Simulation parameter
                  observation_noise_std=None,    # Simulation parameter
-                 model_id=None,                 # Simulation parameter
+                 model_id=None,                 # Simulation parameter - use to manage multiple independent models in the same folder
+                 episodes=1,                    # Job setting
                  episode_callbacks=(),          # Job setting
+                 frame_callbacks=(),            # Job setting
                  save_dirpath=None,             # Job setting
+                 model_load_filepath=None,      # Job setting
                  save_all_episodes=False,       # Job setting
-                 load_existing=False,           # Job setting
                  load_vae=True,                 # Job setting
                  load_transition_model=True,    # Job setting
                  load_biased_model=True,        # Job setting
@@ -50,40 +51,44 @@ def run_training(agent_parameters,              # Agent parameters
         with open(os.path.join(save_dirpath, f'settings{model_id or ""}.pk'), 'wb') as f:
             pickle.dump(dict(agent_parameters=agent_parameters,
                              time_compression=time_compression,
-                             episodes=episodes,
                              observation_noise_std=observation_noise_std,
                              model_id=model_id), f)
-
-        # Load previous model
-        if os.path.exists(model_save_filepath) and load_existing:
-            load_capsule_parameters(aif_agent, model_save_filepath, load_vae, load_transition_model, load_biased_model)
-            if verbose:
-                loaded_models = []
-                loaded_models += ['vae'] if load_vae else []
-                loaded_models += ['transition_model'] if load_transition_model else []
-                loaded_models += ['biased_model'] if load_biased_model and not isinstance(aif_agent.biased_model, distr.Normal) else []
-                print(f"\nLoaded <{', '.join(loaded_models)}> from previous save at <{model_save_filepath}>")
     else:
         model_save_filepath = None
 
+    # Load previous model
+    if model_load_filepath is not None:
+        load_capsule_parameters(aif_agent, model_load_filepath, load_vae, load_transition_model, load_biased_model)
+        if verbose:
+            loaded_models = []
+            loaded_models += ['vae'] if load_vae else []
+            loaded_models += ['transition_model'] if load_transition_model else []
+            loaded_models += ['biased_model'] if load_biased_model and not isinstance(aif_agent.biased_model, distr.Normal) else []
+            print(f"\nLoaded <{', '.join(loaded_models)}> from previous save at <{model_load_filepath}>")
+
+    if save_dirpath is not None and train_parameters:
+        torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_000.pt'))
+
     if not train_parameters:
         aif_agent.eval()
-    max_episode_steps = 1000
     training_history = Timeline()
+    max_episode_steps = 1000
     for episode in range(episodes):
         env.reset()
         aif_agent.reset_states()
+        observations_mapper = observations_mapper if observations_mapper is not None else lambda x: x
         state = observations_mapper(torch.from_numpy(env.state).float())
         action = aif_agent.step(0, state)
         total_reward = 0
         episode_history = Timeline()
         episode_history.log(0, 'true_observations', state)
-        iterator = tqdm(range(max_episode_steps), file=sys.stdout, disable=not verbose)
-        iterator.set_description(f'Trial {episode + 1}/{episodes}')
-        i = 0
+        iterator = tqdm.tqdm(range(max_episode_steps), file=sys.stdout, disable=not verbose)
+        iterator.set_description(f'Running episode {episode}/{episodes}')
         for i in iterator:
             if display_simulation:
-                env.render()
+                frame = env.render(mode='rgb_array')
+            else:
+                frame = None
             t = i + 1
             observation, reward, done, _ = env.step(action)
             observation = observations_mapper(torch.from_numpy(observation).float())
@@ -95,21 +100,32 @@ def run_training(agent_parameters,              # Agent parameters
                 action = np.clip(action, env.min_action, env.max_action)
             total_reward += reward
 
+            for callback in frame_callbacks:
+                callback(**dict(agent=aif_agent,
+                                env=env,
+                                episode_reward=reward,
+                                episode_history=episode_history,
+                                observations_mapper=observations_mapper,
+                                frame=frame))
+
             if done:
-                for callback in episode_callbacks:
-                    callback(**dict(agent=aif_agent,
-                                    env=env,
-                                    episode_reward=reward,
-                                    episode_history=episode_history,
-                                    observations_mapper=observations_mapper))
-                aif_agent.learn_biased_model()  # Train biased model with the successful trajectory
                 iterator.set_postfix_str(f'reward={total_reward:.2f}')
                 break
             elif i == max_episode_steps - 1:
                 iterator.set_postfix_str(f'reward={total_reward:.2f}')
-        if save_dirpath is not None:
-            torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_{episode}.pt'))
-        training_history.log(episode, 'steps_per_episode', i)
+
+        for callback in episode_callbacks:
+            callback(**dict(agent=aif_agent,
+                            env=env,
+                            episode_reward=total_reward,
+                            episode_history=episode_history,
+                            observations_mapper=observations_mapper))
+
+        if total_reward > 0:
+            aif_agent.learn_biased_model()  # Train biased model with the successful trajectory
+        if save_dirpath is not None and train_parameters:
+            torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_{episode + 1:03d}.pt'))
+        training_history.log(episode, 'steps_per_episode', len(episode_history.times))
         training_history.log(episode, 'rewards', total_reward)
 
     env.close()
@@ -117,10 +133,10 @@ def run_training(agent_parameters,              # Agent parameters
 
 
 if __name__ == '__main__':
-    plot = False
+    plot = True
+    _load_existing = True
     experiment_dir = './experiments/single_run/'
     _time_compression = 6
-    _model_id = None
 
     from time import time
 
@@ -131,30 +147,35 @@ if __name__ == '__main__':
                 observation_dim=2,
                 latent_dim=2),
             biased_model=BiasedModelBellman(observation_dim=2, iterate_train=10, discount_factor=0.995),
-            # biased_model=distr.Normal(torch.tensor([0.5, 0.0]), torch.tensor([1.0, 1.0])),
+            # biased_model=distr.Normal(torch.tensor([0.9, 0.0]), torch.tensor([1.0, 1.0])),
             policy_dim=1,
             time_step_size=_time_compression,
-            planning_horizon=10,
+            planning_horizon=5,
             n_policy_samples=700,
-            policy_iterations=3,
+            policy_iterations=2,
             n_policy_candidates=70,
             action_window=2,
             # disable_kl_extrinsic=True,  # Uncomment for ablation study
             # disable_kl_intrinsic=True   # Uncomment for ablation study
         ),
         time_compression=_time_compression,
-        episodes=10,
+        episodes=200,
         observation_noise_std=None,
-        model_id=_model_id,
+        model_id=None,
         episode_callbacks=[plots.show_phase_portrait, plots.show_prediction_vs_outcome] if plot else [],
+        frame_callbacks=(),
         save_dirpath=experiment_dir,
-        save_all_episodes=False,
-        load_existing=False,
+        save_all_episodes=True,
+        model_load_filepath='./experiments/single_run/model.pt' if _load_existing else None,
+        load_vae=True,
+        load_transition_model=True,
+        load_biased_model=True,
         train_parameters=True,
         verbose=True,
         display_simulation=False
     )
+
     print(f'Finished {len(res.times)} episodes in {time() - t0:.1f} seconds')
-    with open(os.path.join(experiment_dir, f'results{_model_id or ""}.pickle'), 'wb') as f:
+    with open(os.path.join(experiment_dir, 'results.pickle'), 'wb') as f:
         pickle.dump(res, f)
-    plots.plot_training_history(res, save_path=os.path.join(experiment_dir, f'run_stats{_model_id or ""}.pdf'), show=False)
+    plots.plot_training_history(res, save_path=os.path.join(experiment_dir, 'run_stats.pdf'), show=False)

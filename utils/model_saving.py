@@ -1,4 +1,5 @@
 import torch
+import torch.distributions
 
 
 def save(model, model_save_filepath):
@@ -20,10 +21,7 @@ def load_capsule_parameters(model, model_save_filepath, load_vae=True, load_tran
         model.vae.load_state_dict(_get_sub_model_state_dict(state_dict, 'vae'))
     if load_transition_model:
         model.transition_model.load_state_dict(_get_sub_model_state_dict(state_dict, 'transition_model'))
-    if load_biased_model:
+    if load_biased_model and not isinstance(model.biased_model, torch.distributions.Distribution):
         if len([key for key in state_dict.keys() if 'biased_model.' in key]) > 0:
             model.biased_model.load_state_dict(_get_sub_model_state_dict(state_dict, 'biased_model'))
 
-
-if __name__ == '__main__':
-    load_capsule_parameters('../mountain_car/experiments/single_run/model.pt')

@@ -12,6 +12,9 @@ class Timeline:
     def times(self):
         return sorted(list(self.tml.keys()))
 
+    def get_frame(self, time):
+        return self.tml[time]
+
     def log(self, time: Union[int, float, List[Union[int, float]], Any], key: str, value: Union[Any, List[Any]]):
         """
         Add an entry for a particular time-step. Raises exception if the key already exists for that time-step.

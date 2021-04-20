@@ -1,75 +1,63 @@
-import sys
 import os
 import subprocess
 import glob
+import shutil
 import pickle
 
-from tqdm import tqdm
-import gym
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
 
-from models.active_inference_capsule import ActiveInferenceCapsule
-from utils.model_saving import load_capsule_parameters
-from utils.value_map import ValueMap
-from utils.timeline import Timeline
 import mountain_car.plotting as plots
+from mountain_car.training import run_training
 
 model_path = './experiments/single_run/model.pt'
 save_dir = './experiments/single_run/'
+freeze_end = True  # Whether to add 1s of video at the last frame
+
+# Prepare save paths
+model_name = os.path.basename(model_path).split(".")[0]
+frames_path = os.path.join(save_dir, f'frames_{model_name}')
+video_path = os.path.join(save_dir, f'video_{model_name}.mp4')
+if not os.path.exists(frames_path):
+    os.makedirs(frames_path)  # Make a directory to save the frame images
+
+
+# Callback function to draw each episode frame
+def save_video_frame(agent, episode_history, observations_mapper, frame, **kwargs):
+    fig = plots.make_video_frame(agent, episode_history, frame, observations_mapper)
+    if model_name[-4] == '_':
+        fig.subplots_adjust(top=0.88)
+        fig.suptitle(f'Episode {int(model_name[-3:])}', y=0.98)
+    fig.savefig(os.path.join(frames_path, f'frame_{len(episode_history.times):04d}.png'), dpi=200)
+    plt.close(fig)
+
 
 if __name__ == '__main__':
-    # Load model settings and set up agent and simulation
-    with open(os.path.join(os.path.dirname(model_path), 'settings.pk'), 'rb') as f:
-        settings = pickle.load(f)
-    aif_agent = ActiveInferenceCapsule(**settings['agent_parameters'])
-    load_capsule_parameters(aif_agent, model_path, load_vae=True, load_transition_model=True, load_biased_model=True)
-    env = gym.make('MountainCarContinuous-v0').env
-    observations_mapper = ValueMap(in_min=torch.tensor((-1.2, -0.07)), in_max=torch.tensor((0.6, 0.07)),
-                                   out_min=torch.tensor((-1.0, -1.0)), out_max=torch.tensor((1.0, 1.0)))
-    time_compression = settings['time_compression']
-    observation_noise_std = settings['observation_noise_std']
-
-    # Prepare save paths
-    model_name = os.path.basename(model_path).split(".")[0]
-    frames_path = os.path.join(save_dir, f'frames_{model_name}')
-    video_path = os.path.join(save_dir, f'video_{model_name}.mp4')
-    if not os.path.exists(frames_path):
-        os.makedirs(frames_path)   # Make a directory to save the frame images
-
     # If a video was previously made for the same model, delete it and clear all frames
     for file_name in glob.glob(os.path.join(frames_path, '*.png')):
         os.remove(file_name)
     if os.path.exists(video_path):
         os.remove(video_path)
 
-    aif_agent.eval()    # Do not train parameters
-    action = aif_agent.step(0, observations_mapper(torch.tensor(env.state, dtype=torch.float32))) # get first action
-    episode_history = Timeline()
-    max_episode_steps = 1000
-    iterator = tqdm(range(max_episode_steps), file=sys.stdout)
-    for i in iterator:
-        img = env.render(mode='rgb_array')
-        t = i + 1
-        observation, _, done, _ = env.step(action)
-        observation = observations_mapper(torch.from_numpy(observation).float())
-        episode_history.log(t, 'true_observations', observation)
-        episode_history.log(t - 1, 'true_actions', action)
-        if i % time_compression == 0:
-            obs_noise = observation if observation_noise_std is None else observation + np.random.normal(loc=0.0, scale=observation_noise_std)
-            action = aif_agent.step(t, obs_noise, action)
-            action = np.clip(action, env.min_action, env.max_action)
+    # Load model and simulation settings
+    with open(os.path.join(os.path.dirname(model_path), 'settings.pk'), 'rb') as f:
+        settings = pickle.load(f)
 
-        fig = plots.make_video_frame(aif_agent, episode_history, img, observations_mapper)
-        fig.savefig(os.path.join(frames_path, f'frame_{i:04d}.png'), dpi=200)
-        plt.close(fig)
+    # Run the episode, rendering and saving each frame
+    run_training(
+        **settings,
+        frame_callbacks=[save_video_frame],
+        display_simulation=True,
+        train_parameters=True,
+        model_load_filepath=model_path
+    )
 
-        if done:
-            break
+    if freeze_end:  # Freeze the last second of video by repeating the last frame fps times
+        last_frame = sorted(glob.glob(os.path.join(frames_path, f'frame_*.png')))[-1]
+        last_id = int(last_frame[-8:-4])
+        for i in range(1, 25):
+            shutil.copy(last_frame, os.path.join(frames_path, f'frame_{last_id + i:04d}.png'))
 
-    env.close()
-
+    # Generate video from saved frames
     subprocess.call([
         'ffmpeg',
         '-i', os.path.join(frames_path, 'frame_%04d.png'),  # input images

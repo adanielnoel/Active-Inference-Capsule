@@ -5,15 +5,15 @@ import pickle
 
 from tqdm import tqdm
 
-from mountain_car.single_run import run_training
+from mountain_car.training import run_training
 import mountain_car.plotting as plots
 from models.vae_dense_obs import DenseObservation_VAE
 from models.biased_model import BiasedModelBellman
 
-num_simulations = 7
+num_simulations = 15
 experiment_dir = './experiments/batch_run/'
 save_models = False
-num_episodes = 100
+num_episodes = 200
 time_compression = 6
 observation_noise_std = None  # (0.05, 0.05)
 agent_parameters = dict(
@@ -24,7 +24,7 @@ agent_parameters = dict(
             # biased_model=distr.Normal(torch.tensor([0.5, 0.0]), torch.tensor([1.0, 1.0])),
             policy_dim=1,
             time_step_size=time_compression,
-            planning_horizon=10,
+            planning_horizon=5,
             n_policy_samples=700,
             policy_iterations=3,
             n_policy_candidates=70,
@@ -43,7 +43,6 @@ def run_training_process(training_id):
         episodes=num_episodes,
         observation_noise_std=observation_noise_std,
         model_id=training_id,
-        load_existing=False,
         verbose=False)
 
 

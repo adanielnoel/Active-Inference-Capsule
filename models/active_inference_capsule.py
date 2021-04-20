@@ -2,7 +2,6 @@ from typing import Union, Iterable
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.distributions as distr
 import torch.autograd.profiler as profiler
 
@@ -13,16 +12,12 @@ from utils.timeline import Timeline
 
 class ActiveInferenceCapsule(nn.Module):
     """
-    An active inference (AIF) capsule is the main building block for active inference agents.
-    It performs learning of the observation, transition and biased generative model, and
-    deliberates over policies to select the one with the lowest Free Energy of the Expected Future.
+    Learns observation, transition and biased generative models, and
+    generates policies with minimal Free Energy of the Expected Future [1].
 
     Use:
-        An AIF capsule keeps track of the last known latent state and dynamic states, and projects
-        predictions from them. Therefore, it is important that all observations and executed actions
-        are processed, to keep account of the correct states. This can be done by passing observation
-        and action sequences to `learn_policy_outcome`. This will both train the predictor on the
-        sequence (one SGD step) and save the last latent and dynamic states.
+        Call step() at every time-step. The function returns the action to take next.
+        If using a learned prior, call learn_biased_model() when the goal is reached.
 
     References:
         - [1] B. Millidge et al, “Whence the Expected Free Energy?,” 2020, doi: 10.1162/neco_a_01354.
@@ -38,19 +33,20 @@ class ActiveInferenceCapsule(nn.Module):
                  n_policy_samples: int,
                  policy_iterations: int,
                  n_policy_candidates: int,
-                 disable_kl_intrinsic=False,
-                 disable_kl_extrinsic=False):
+                 disable_kl_intrinsic=False,    # Use for ablation studies
+                 disable_kl_extrinsic=False):   # Use for ablation studies
         super(ActiveInferenceCapsule, self).__init__()
         self.max_predicted_log_prob = 0.0
 
         # internal models
-        self.vae = vae
-        self.biased_model = biased_model
-        self.transition_model = PredictorGRU(latent_dim=vae.latent_dim,
-                                             policy_dim=policy_dim,
-                                             dynamic_dim=planning_horizon * vae.latent_dim * 1,  # Make large enough for representing trajectories (heuristic)
-                                             num_rnn_layers=1,
-                                             post_dist=vae.qx_y)
+        self.vae = vae                          # p(x|y) and p(y|x)
+        self.transition_model = PredictorGRU(   # p(x|𝜋)
+            latent_dim=vae.latent_dim,
+            policy_dim=policy_dim,
+            dynamic_dim=planning_horizon * vae.latent_dim * 1,  # Make large enough for representing trajectories (heuristic)
+            num_rnn_layers=1,
+            post_dist=vae.qx_y)
+        self.biased_model = biased_model        # Given or learnable prior
 
         # Policy settings
         self.planning_horizon = planning_horizon
@@ -62,8 +58,8 @@ class ActiveInferenceCapsule(nn.Module):
         self.use_kl_extrinsic = not disable_kl_extrinsic
 
         # Short-term memory
-        self.dyn_state = None
-        self.last_latent = None
+        self.dyn_state = None       # Latest dynamical state z
+        self.last_latent = None     # Latest latent state x
         self.policy = None
         self.policy_std = None
         self.next_FEEFs = None
@@ -136,7 +132,7 @@ class ActiveInferenceCapsule(nn.Module):
                 new_VFEs, new_posterior_distr = self.perceive_observations(new_observations)  # + learning step on self.vae if in training mode
             with profiler.record_function("Retrospect_actions"):
                 self.dyn_state = self.perceive_policy_outcome(new_posterior_distr, new_actions)  # + learning step on self.transition_model if in training mode
-                self.last_latent = new_posterior_distr.mean[-1].reshape(1, 1, -1)
+                new_latent = new_posterior_distr.mean[-1].reshape(1, 1, -1)
             with profiler.record_function("Sample_policy"):
                 self.policy, self.policy_std, self.next_FEEFs, self.next_locs, self.next_scales = self.sample_policy()
                 pred_t = time + self.time_step_size * torch.arange(0, self.planning_horizon)
@@ -157,6 +153,7 @@ class ActiveInferenceCapsule(nn.Module):
             self.new_observations = []
             self.new_actions = []
             self.new_times = []
+            self.last_latent = new_latent
 
         action = self.policy[len(self.new_actions)]
         action_std = self.policy_std[len(self.new_actions)]
@@ -246,7 +243,6 @@ class ActiveInferenceCapsule(nn.Module):
               For instance, y_5 of this retrospect call will be y_1 of the next one.
         """
         if self.training:
-            self.set_predictor_requires_grad(True)  # Make sure gradients are computed for the predictor model
             new_dyn_state = self.transition_model.learn_policy_outcome(px_y, policy, self.dyn_state, self.last_latent)
         else:
             new_dyn_state, _ = self.transition_model.perceive_policy_outcome(px_y, policy, self.dyn_state, self.last_latent)
@@ -261,7 +257,6 @@ class ActiveInferenceCapsule(nn.Module):
         """
         VFE, qx_y = None, None
         if self.training:
-            self.set_spatial_requires_grad(True)  # Make sure gradients are computed for the autoencoder weights
             with profiler.record_function("Learn VAE"):
                 # Learns new observation until the variational free energy is below a threshold
                 # Note: if this threshold is set too low it may damage previous learning. The purpose of multiple iterations
@@ -281,20 +276,3 @@ class ActiveInferenceCapsule(nn.Module):
         if not isinstance(self.biased_model, distr.Distribution):
             _, po = self.logged_history.select_features('perceived_observations')
             self.biased_model.learn(torch.stack(po))
-
-    def set_spatial_requires_grad(self, flag):
-        for parameter in self.vae.parameters():
-            parameter.requires_grad = flag
-
-    def set_predictor_requires_grad(self, flag):
-        for parameter in self.transition_model.parameters():
-            parameter.requires_grad = flag
-
-    def set_biased_requires_grad(self, flag):
-        for parameter in self.biased_model.parameters():
-            parameter.requires_grad = flag
-
-    def set_requires_grad(self, flag):
-        self.set_spatial_requires_grad(flag)
-        self.set_predictor_requires_grad(flag)
-        self.set_biased_requires_grad(flag)
