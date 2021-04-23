@@ -11,7 +11,7 @@ class Enc(nn.Module):
     def __init__(self, observation_dim, latent_dim):
         super(Enc, self).__init__()
         self.enc = nn.Sequential(
-            nn.Linear(observation_dim, observation_dim * 10),
+            nn.Linear(observation_dim, latent_dim * 10),
             SiLU()
         )
         self.c1 = nn.Linear(latent_dim * 10, latent_dim)
@@ -23,27 +23,34 @@ class Enc(nn.Module):
 
 
 class Dec(nn.Module):
-    def __init__(self, observation_dim, latent_dim):
+    def __init__(self, observation_dim, latent_dim, observation_noise_std=None):
         super(Dec, self).__init__()
+        if observation_noise_std is None:
+            self.observation_noise_std = torch.full([observation_dim], 0.05)
+        elif isinstance(observation_noise_std, float):
+            self.observation_noise_std = torch.full([observation_dim], observation_noise_std)
+        elif isinstance(observation_noise_std, (tuple, list, torch.Tensor)):
+            assert len(observation_noise_std) == observation_dim
+            self.observation_noise_std = torch.tensor(observation_noise_std, dtype=torch.float32)
+        else:
+            raise TypeError('Expected None, float, tuple, list or torch.Tensor for observation_noise_std')
+
         self.dec = nn.Sequential(
             nn.Linear(latent_dim, latent_dim * 10),
             SiLU()
         )
-        self.c1 = nn.Linear(observation_dim * 10, observation_dim)
+        self.c1 = nn.Linear(latent_dim * 10, observation_dim)
 
     def forward(self, x):
         d = self.dec(x)
-        return self.c1(d), torch.tensor(0.02).to(x.device)
+        return self.c1(d), self.observation_noise_std
 
 
 class DenseObservation_VAE(VAE):
-    def __init__(self, observation_dim, latent_dim):
+    def __init__(self, observation_dim, latent_dim, observation_noise_std=None):
         super(DenseObservation_VAE, self).__init__(
-            prior_dist=distr.Normal,
-            likelihood_dist=distr.Normal,
-            post_dist=distr.Normal,
             enc=Enc(observation_dim, latent_dim),
-            dec=Dec(observation_dim, latent_dim),
+            dec=Dec(observation_dim, latent_dim, observation_noise_std),
             observation_dim=observation_dim,
             latent_dim=latent_dim
         )

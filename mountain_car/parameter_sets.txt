@@ -1,0 +1,59 @@
+name = 'results_normal60'
+_learn_biased_model = False
+_include_cart_velocity = True
+_observation_noise_std = None
+_time_compression = 6
+_planning_horizon = 10
+n_policy_samples=700,
+policy_iterations=2,
+n_policy_candidates=70,
+action_window=2
+# > Training time ~25min
+
+name = 'results_normal90'
+_learn_biased_model = False
+_include_cart_velocity = True
+_observation_noise_std = None
+_time_compression = 6
+_planning_horizon = 15
+n_policy_samples=1500,
+policy_iterations=2,
+n_policy_candidates=70,
+action_window=2
+# > Training time ~30min, FAILS
+
+name = 'results_bellman30'
+_learn_biased_model = False
+_include_cart_velocity = True
+_observation_noise_std = None
+_time_compression = 6
+_planning_horizon = 5
+n_policy_samples=700,
+policy_iterations=2,
+n_policy_candidates=70,
+action_window=2
+# > Training time ~4min
+
+name = 'results_bellman60'
+_learn_biased_model = False
+_include_cart_velocity = True
+_observation_noise_std = None
+_time_compression = 6
+_planning_horizon = 10
+n_policy_samples=700,
+policy_iterations=2,
+n_policy_candidates=70,
+action_window=2
+# > Training time ~8min
+
+name = 'results_bellman30_noise'
+_learn_biased_model = True
+_include_cart_velocity = True
+_observation_noise_std = 0.08 # None
+_time_compression = 6
+_planning_horizon = 5
+n_policy_samples=700,
+policy_iterations=2,
+n_policy_candidates=70,
+action_window=2
+# > Training time ~4min

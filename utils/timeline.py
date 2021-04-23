@@ -42,13 +42,11 @@ class Timeline:
         times = []
         values = [[] for _ in keys]
         for time in sorted(self.times):  # make sure the return time-series is sorted (increasing time)
-            key_found = False
+            if not all([key in self.tml[time].keys() for key in keys]):
+                continue    # Only include time-step if all keys have a datapoint in it
+            times.append(time)
             for i, key in enumerate(keys):
-                if key in self.tml[time].keys():
-                    key_found = True
-                    values[i].append(self.tml[time][key])
-            if key_found:
-                times.append(time)
+                values[i].append(self.tml[time][key])
         if len(values) == 1:
             return times, values[0]
         else:
