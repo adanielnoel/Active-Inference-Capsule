@@ -15,11 +15,11 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     times_act_loc, (act_loc, act_std) = merged_history.select_features(['actions_loc', 'actions_std'])
     act_loc, act_std = torch.stack(act_loc).view(-1), torch.stack(act_std).view(-1)
     axis.fill_between(times_act_loc, act_loc - act_std, act_loc + act_std, color='r', alpha=0.3, linewidth=0)
-    pl_pol = axis._display_plots(times_act_loc, act_loc, 'r--', linewidth=1, label='Policy')
+    pl_pol = axis.plot(times_act_loc, act_loc, 'r--', linewidth=1, label='Policy')
 
     # 2) Plot executed actions
     times_actions, true_actions = merged_history.select_features('true_actions')
-    pl_act = axis._display_plots(times_actions, true_actions, 'b', linewidth=1, label='Executed action')
+    pl_act = axis.plot(times_actions, true_actions, 'b', linewidth=1, label='Executed action')
 
     axis.set_ylabel('a', color='r', rotation=0)
     axis.tick_params(axis='y', labelcolor='r')
@@ -30,13 +30,13 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     times_noisy_observations, noisy_observations = merged_history.select_features('noisy_observations')
     true_observations = torch.stack(true_observations)
     noisy_observations = torch.stack(noisy_observations)
-    pl_pos = axis_obs._display_plots(times_true_observations, true_observations[:, 0], color='k', linewidth=1.0, label='true position')
-    pl_pos_noise = axis_obs._display_plots(times_noisy_observations, noisy_observations[:, 0], color='k', linestyle='--', linewidth=1.0, label='noisy observation')
+    pl_pos = axis_obs.plot(times_true_observations, true_observations[:, 0], color='k', linewidth=1.0, label='true position')
+    pl_pos_noise = axis_obs.plot(times_noisy_observations, noisy_observations[:, 0], color='k', linestyle='--', linewidth=1.0, label='noisy observation')
     # 4) Plot expected observations
     times_filtered, (filtered_locs, filtered_stds) = merged_history.select_features(['filtered_observations_locs', 'filtered_observations_stds'])
     locs_, stds_ = torch.stack(filtered_locs)[:, 0], torch.stack(filtered_stds)[:, 0]
     axis_obs.fill_between(times_filtered, locs_ + stds_, locs_ - stds_, color='k', alpha=0.3)
-    pl_rec = axis_obs._display_plots(times_filtered, locs_, 'k', linestyle='dotted', linewidth=1.0, label='filtered belief')
+    pl_rec = axis_obs.plot(times_filtered, locs_, 'k', linestyle='dotted', linewidth=1.0, label='filtered belief')
     axis_obs.set_ylabel('x', rotation=0)  # we already handled the x-label with ax1
 
     # Make common legend for both axes
@@ -59,19 +59,19 @@ def _plot_latent_prediction(axis, latent_idx, merged_history: Timeline):
         times_pred, (pred_locs, pred_stds) = prediction.select_features(['pred_locs', 'pred_stds'])
         pred_locs, pred_stds = torch.stack(pred_locs)[:, latent_idx], torch.stack(pred_stds)[:, latent_idx]  # convert to tensor and select latent dimension i
         axis.fill_between(times_pred, pred_locs - pred_stds, pred_locs + pred_stds, color='k', alpha=0.1, linewidth=1)
-        axis._display_plots(times_pred, pred_locs, 'k--', alpha=0.7, linewidth=0.3, label='Predicted latent' if j == 1 else None)
+        axis.plot(times_pred, pred_locs, 'k--', alpha=0.7, linewidth=0.3, label='Predicted latent' if j == 1 else None)
 
     # 2) plot expected latents
     times_expectations, (expected_locs, expected_stds) = merged_history.select_features(['expected_locs', 'expected_stds'])
     expected_locs, expected_stds = torch.stack(expected_locs)[:, latent_idx], torch.stack(expected_stds)[:, latent_idx]  # convert to tensor and select latent dimension i
     axis.fill_between(times_expectations, expected_locs - expected_stds, expected_locs + expected_stds, color='r', linewidth=0, alpha=0.3)
-    axis._display_plots(times_expectations, expected_locs, color=(0.8, 0, 0), linestyle='--', linewidth=1.0, alpha=0.8, label='Expected latent')
+    axis.plot(times_expectations, expected_locs, color=(0.8, 0, 0), linestyle='--', linewidth=1.0, alpha=0.8, label='Expected latent')
 
     # 3) Plot perceived latents
     times_percepts, (perceived_locs, perceived_stds) = merged_history.select_features(['perceived_locs', 'perceived_stds'])
     perceived_locs, perceived_stds = torch.stack(perceived_locs)[:, latent_idx], torch.stack(perceived_stds)[:, latent_idx]  # convert to tensor and select latent dimension i
     axis.fill_between(times_percepts, perceived_locs - perceived_stds, perceived_locs + perceived_stds, color='b', linewidth=0, alpha=0.4)
-    axis._display_plots(times_percepts, perceived_locs, 'b', linewidth=1.0, label='Perceived latent')
+    axis.plot(times_percepts, perceived_locs, 'b', linewidth=1.0, label='Perceived latent')
 
     axis.grid(linewidth=0.5, alpha=0.5)
     axis.set_title(f'Latent {latent_idx + 1}')
@@ -103,7 +103,7 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
 
     # 2) Plot trajectories
     true_observations = torch.stack(episode_history.select_features('true_observations')[1])
-    axis._display_plots(true_observations[:, 0], true_observations[:, 1], color=(0.5, 0.5, 1.0), linewidth=1.5)
+    axis.plot(true_observations[:, 0], true_observations[:, 1], color=(0.5, 0.5, 1.0), linewidth=1.5)
     axis.scatter([true_observations[0, 0]], [true_observations[0, 1]], color='r')
 
     if agent.observation_dim == 2:
@@ -111,7 +111,7 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
         if len(perceived_locs) > 1:  # Skip if no planning done yet
             perceived_locs = torch.stack(perceived_locs)
             perceived_observations = agent.vae.decode(perceived_locs).detach()
-            axis._display_plots(perceived_observations[:, 0], perceived_observations[:, 1], color=(0.0, 1.0, 0.0), linestyle='--', linewidth=1.5)
+            axis.plot(perceived_observations[:, 0], perceived_observations[:, 1], color=(0.0, 1.0, 0.0), linestyle='--', linewidth=1.5)
 
         # Plot predicted trajectories
         times_predictions, predictions = agent.logged_history.select_features('predictions')
@@ -121,7 +121,7 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
             perceived_locs = agent.logged_history.get_frame(times_predictions[j])['perceived_locs']
             # pred_locs = torch.stack(pred_locs)
             pred_obs = agent.vae.decode(torch.cat([perceived_locs.unsqueeze(0), pred_locs])).detach()
-            axis._display_plots(pred_obs[:, 0], pred_obs[:, 1], color=(0.0, 1.0, 0.0), alpha=0.5, linewidth=0.5, label='Perceived latent' if j == 1 else None)
+            axis.plot(pred_obs[:, 0], pred_obs[:, 1], color=(0.0, 1.0, 0.0), alpha=0.5, linewidth=0.5, label='Perceived latent' if j == 1 else None)
 
     # 3) Plot goal box
     x1, y1 = observations_mapper(torch.tensor((0.45, 0.0)))  # thresholds for mountain-car goal, transformed to problem coordinates
@@ -170,8 +170,8 @@ def show_FEEF_vs_FE(agent: ActiveInferenceCapsule, **kwargs):
     times_FE, VFE = agent.logged_history.select_features('VFE')
     expected_FEEF = torch.stack(expected_FEEF).view(-1)
     VFE = torch.stack(VFE).view(-1)
-    ax._display_plots(times_FE, VFE, 'b-', label='VFE')
-    ax._display_plots(times_FEEF, expected_FEEF, 'r--', label='FEEF')
+    ax.plot(times_FE, VFE, 'b-', label='VFE')
+    ax.plot(times_FEEF, expected_FEEF, 'r--', label='FEEF')
     ax.legend()
     fig.tight_layout()
     plt.show()
@@ -195,7 +195,7 @@ def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=
     ax = fig.gca()
     if len(all_rewards) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax._display_plots(times, r_mean, color=color, label=label)
+    ax.plot(times, r_mean, color=color, label=label)
     ax.set_yticks([0, min(r_min), 200, 400, 600, 800, 1000])
     ax.set_ylim((0, 1000.0))
 
@@ -232,7 +232,7 @@ def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_p
     ax = fig.gca()
     if len(all_free_energies) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax._display_plots(times, r_mean, color=color, label=label)
+    ax.plot(times, r_mean, color=color, label=label)
 
     if figure is None:
         plt.grid(linewidth=0.4, alpha=0.5)
@@ -253,8 +253,8 @@ def plot_cumulative_free_energies(timeline: Timeline):
     episodes, (cumulative_VFE, cumulative_FEEF) = timeline.select_features(['cumulative_VFE', 'cumulative_FEEF'])
     fig = plt.figure(figsize=(6, 4))
     ax = fig.gca()
-    ax._display_plots(episodes, cumulative_VFE, 'b-', label='Cumulative FE')
-    ax._display_plots(episodes, cumulative_FEEF, 'r--', label='Cumulative FEEF')
+    ax.plot(episodes, cumulative_VFE, 'b-', label='Cumulative FE')
+    ax.plot(episodes, cumulative_FEEF, 'r--', label='Cumulative FEEF')
     ax.legend()
     ax.set_xlabel('Episode')
     ax.set_ylabel('Free energy')

@@ -25,6 +25,6 @@ The routine spawns multiple simulations in parallel and saves the results to a `
 - To plot training statistics, run the script `mountain_car/plot_multiple_trainings.py`. In it, you can specify which results to plot. 
 
 ## Generating a video
-- First, train a single agent. Note: in `mountain_car/training.py` you can specify `save_all_episodes=True`, which will save a model per epoch instead of overriding the previous one.
-- Specify the path to the desired model in `mountain_car/make_video.py` and run. This will start saving individual frames, typically in a subdirectory in `mountain_car/experiments/single_run/`. After reaching the goal, it will call `ffmpeg` to generate an `mp4` file.
+- First, train a single agent. Note: in `mountain_car/training.py` you can specify `save_all_episodes=True`, which will save a model per episode instead of overriding the previous one.
+- Specify the path to the desired model in `mountain_car/make_video.py` and run it. This will start saving individual frames, typically in a subdirectory in `mountain_car/experiments/single_run/`. When the agent reaches the goal, it will call `ffmpeg` to generate an `mp4` file.
 

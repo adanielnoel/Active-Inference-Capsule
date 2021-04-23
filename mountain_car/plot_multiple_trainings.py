@@ -10,8 +10,8 @@ from mountain_car.plotting import plot_training_history, plot_training_free_ener
 # ]
 
 results = [
-    ('Normal prior, 60 steps', (0.2, 0.4, 1.0), './experiments/batch_run/results_normal60.pickle'),
-    ('Normal prior, 90 steps', (0.8, 0.3, 0.3), './experiments/batch_run/results_normal90.pickle'),
+    ('Normal prior, 90 steps', (0.2, 0.4, 1.0), './experiments/batch_run/results_normal90.pickle'),
+    ('Normal prior, 60 steps', (0.8, 0.3, 0.3), './experiments/batch_run/results_normal60.pickle'),
     ('Bellman prior, 30 steps', (0.3, 0.6, 0.3), './experiments/batch_run/results_bellman30.pickle'),
     # ('Bellman prior, 60 steps', (0.3, 0.6, 0.3), './experiments/batch_run/results_bellman60.pickle')
 ]
@@ -41,5 +41,7 @@ fig_st.gca().legend()
 fig_fe.gca().legend()
 fig_st.tight_layout()
 fig_fe.tight_layout()
-# plt.legend()
 plt.show()
+fig_fe.gca().set_ylim((-500, 2500))
+fig_fe.savefig('./experiments/batch_run/goal_vs_rewards_free_energy.pdf')
+fig_st.savefig('./experiments/batch_run/goal_vs_rewards_episode_length.pdf')
