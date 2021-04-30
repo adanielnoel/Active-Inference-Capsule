@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import torch
+import numpy as np
 
 from models.active_inference_capsule import ActiveInferenceCapsule
 from utils.timeline import Timeline
+from utils.signal_smoothing import smooth
 
 
 def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_history: Timeline):
@@ -47,7 +49,7 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     axis.set_yticks([-2, -1, 0, 1, 2])
     axis_obs.set_ylim((-1.1, 1.1))
     axis.grid(linewidth=0.5, alpha=0.5)
-    axis.set_title('Policy and car position')
+    axis.set_title('Observations and policy')
 
     return axis
 
@@ -78,7 +80,7 @@ def _plot_latent_prediction(axis, latent_idx, merged_history: Timeline):
     axis.legend(loc='lower right', framealpha=0.3)
 
 
-def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_history: Timeline, observations_mapper, **kwargs):
+def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_history: Timeline, observations_mapper, label_cbar=True, **kwargs):
     axis.set_aspect(1.0)
     grid_points = 30
     # 1) Plot heat map of extrinsic KL divergence
@@ -95,11 +97,14 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
 
     clev = torch.linspace(kl_extrinsic.min().item(), kl_extrinsic.max().item(), 100)
     cs = axis.contourf(sample_positions.expand((grid_points, grid_points)), sample_velocities.expand((grid_points, grid_points)).transpose(1, 0), kl_extrinsic, clev, cmap='magma')
+    for c in cs.collections:
+        c.set_rasterized(True)
 
     divider = make_axes_locatable(axis)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = fig.colorbar(cs, cax=cax, ticks=torch.linspace(kl_extrinsic.min().item(), kl_extrinsic.max().item(), 6))
-    cbar.set_label('KL extr.')
+    if label_cbar:
+        cbar.set_label('KL extr.')
 
     # 2) Plot trajectories
     true_observations = torch.stack(episode_history.select_features('true_observations')[1])
@@ -156,9 +161,12 @@ def show_prediction_vs_outcome(agent: ActiveInferenceCapsule, episode_history: T
 
 
 def show_phase_portrait(agent: ActiveInferenceCapsule, episode_history: Timeline, observations_mapper, **kwargs):
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(5, 4))
     axis = fig.gca()
     _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper)
+    axis.set_title('Given prior, T=90')
+    fig.tight_layout()
+    plt.savefig('phase_portrait.pdf')
     plt.show()
     plt.close()
 
@@ -178,25 +186,26 @@ def show_FEEF_vs_FE(agent: ActiveInferenceCapsule, **kwargs):
     plt.close()
 
 
-def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0)):
+def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-'):
     timelines = [timelines] if isinstance(timelines, Timeline) else timelines
     all_rewards = []
     times = None
     for timeline in timelines:
         times, rewards = timeline.select_features('steps_per_episode')
         all_rewards.append(rewards)
-    all_rewards = torch.tensor(all_rewards, dtype=torch.float32)
 
-    r_mean = all_rewards.mean(0)
-    r_max = r_mean + all_rewards.std(0) # all_rewards.max(0)[0]
-    r_min = [max(a, b) for a, b in zip(r_mean - all_rewards.std(0), all_rewards.min(0)[0])]
+    all_rewards = np.array(all_rewards)
+    r_mean = smooth(all_rewards.mean(0))
+    r_std = all_rewards.std(0)
+    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_rewards.max(0))]))
+    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_rewards.min(0))]))
 
     fig = figure or plt.figure(figsize=(6, 4))
     ax = fig.gca()
     if len(all_rewards) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax.plot(times, r_mean, color=color, label=label)
-    ax.set_yticks([0, min(r_min), 200, 400, 600, 800, 1000])
+    ax.plot(times, r_mean, color=color, linestyle=linestyle, linewidth=1.0, label=label)
+    ax.set_yticks([0, 70, 200, 400, 600, 800, 1000])
     ax.set_ylim((0, 1000.0))
 
     if figure is None:
@@ -214,25 +223,25 @@ def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=
         return fig
 
 
-def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0)):
+def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-'):
     timelines = [timelines] if isinstance(timelines, Timeline) else timelines
     all_free_energies = []
     times = None
     for timeline in timelines:
         times, free_energy = timeline.select_features('cumulative_VFE')
         all_free_energies.append(free_energy)
-    all_free_energies = torch.tensor(all_free_energies, dtype=torch.float32)
 
-    r_mean = all_free_energies.mean(0)
-    # r_max = r_mean + all_free_energies.std(0) # all_rewards.max(0)[0]
-    r_max = [min(a, b) for a, b in zip(r_mean + all_free_energies.std(0), all_free_energies.max(0)[0])]
-    r_min = [max(a, b) for a, b in zip(r_mean - all_free_energies.std(0), all_free_energies.min(0)[0])]
+    all_free_energies = np.array(all_free_energies)
+    r_mean = smooth(all_free_energies.mean(0))
+    r_std = all_free_energies.std(0)
+    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_free_energies.max(0))]))
+    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_free_energies.min(0))]))
 
     fig = figure or plt.figure(figsize=(6, 4))
     ax = fig.gca()
     if len(all_free_energies) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax.plot(times, r_mean, color=color, label=label)
+    ax.plot(times, r_mean, color=color, linestyle=linestyle, linewidth=1.0, label=label)
 
     if figure is None:
         plt.grid(linewidth=0.4, alpha=0.5)

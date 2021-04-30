@@ -1,4 +1,5 @@
 name = 'results_normal60'
+num_episodes = 150
 _learn_biased_model = False
 _include_cart_velocity = True
 _observation_noise_std = None
@@ -11,6 +12,7 @@ action_window=2
 # > Training time ~25min
 
 name = 'results_normal90'
+num_episodes = 150
 _learn_biased_model = False
 _include_cart_velocity = True
 _observation_noise_std = None
@@ -23,7 +25,8 @@ action_window=2
 # > Training time ~30min, FAILS
 
 name = 'results_bellman30'
-_learn_biased_model = False
+num_episodes = 150
+_learn_biased_model = True
 _include_cart_velocity = True
 _observation_noise_std = None
 _time_compression = 6
@@ -35,6 +38,7 @@ action_window=2
 # > Training time ~4min
 
 name = 'results_bellman60'
+num_episodes = 150
 _learn_biased_model = False
 _include_cart_velocity = True
 _observation_noise_std = None
@@ -47,6 +51,7 @@ action_window=2
 # > Training time ~8min
 
 name = 'results_bellman30_noise'
+num_episodes = 150
 _learn_biased_model = True
 _include_cart_velocity = True
 _observation_noise_std = 0.08 # None
@@ -57,3 +62,17 @@ policy_iterations=2,
 n_policy_candidates=70,
 action_window=2
 # > Training time ~4min
+
+name = 'results_random'
+num_episodes = 150
+_learn_biased_model = False
+_include_cart_velocity = True
+_observation_noise_std = None # 0.08
+_time_compression = 6
+_planning_horizon = 3
+policy_dim=1,
+n_policy_samples=1,
+policy_iterations=1,
+n_policy_candidates=1,
+action_window=2
+# > Training time ~7min

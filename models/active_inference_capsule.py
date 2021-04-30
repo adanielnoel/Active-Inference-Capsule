@@ -136,6 +136,7 @@ class ActiveInferenceCapsule(nn.Module):
             expected_likelihood = self.vae.decode_density(expected_posterior.mean)
             # expected_likelihood = distr.Normal(self.vae.decode(expected_posterior.mean), 1.0)
             new_VFEs = (-expected_likelihood.log_prob(new_observations) + distr.kl_divergence(expected_posterior, new_posterior)).sum(1)
+            # new_VFEs = (-expected_likelihood.log_prob(new_observations) + distr.kl_divergence(expected_posterior, self.vae.px)).sum(1)
             self.logged_history.log(self.new_times, 'VFE', new_VFEs.detach())
             self.logged_history.log(self.new_times, 'perceived_locs', new_posterior.mean.detach())
             self.logged_history.log(self.new_times, 'perceived_stds', new_posterior.stddev.detach())
@@ -200,11 +201,10 @@ class ActiveInferenceCapsule(nn.Module):
 
     def sample_policy(self):
         """
-        Implementation of the CEM algorithm.
-        Similarly as done in [1], originally proposed in [2].
+        Implementation of the Cross Entropy Method.
+        Similarly as done in [1].
         References:
             [1] Tschantz, A., Millidge, B., Seth, A. K., & Buckley, C. L. (2020). Reinforcement Learning through Active Inference. ArXiv. http://arxiv.org/abs/2002.12636
-            [2] Rubinstein, R. Y. (1997). Optimization of computer simulation models with rare events. European Journal of Operational Research, 99(1), 89–112. https://doi.org/10.1016/S0377-2217(96)00385-2
         """
 
         mean_best_policies = torch.zeros([self.planning_horizon, self.policy_dim])
