@@ -19,9 +19,9 @@ plt.rcParams.update({
 def goal_vs_rewards():
     results = [
         ('Random agent', (0.7, 0.7, 0.7), 'dotted', 'results_random.pickle'),
-        ('Given prior, T=90', (0.3, 0.5, 1.0), '--', 'results_normal90.pickle'),
         ('Given prior, T=60', (0.8, 0.3, 0.3), '-.', 'results_normal60.pickle'),
-        ('Learned prior, T=30', (0.3, 0.7, 0.3), '-', 'results_bellman30.pickle'),
+        ('Given prior, T=90', (0.3, 0.5, 1.0), '--', 'results_normal90.pickle'),
+        ('Learned prior, T=36', (0.3, 0.7, 0.3), '-', 'results_bellman36.pickle'),
     ]
 
     fig_st = plt.figure(1, figsize=(6, 3))
@@ -40,15 +40,15 @@ def goal_vs_rewards():
     fig_st.tight_layout()
     fig_st.gca().set_xlim((0, 150))
     fig_st.gca().set_ylim((0, 1000))
-    plt.show()
+    # plt.show()
 
     fig_st.savefig('./figures/goal_vs_rewards_episode_length.pdf')
 
 
 def clean_vs_noise():
     results = [
-        ('Learned prior, T=30', (0.3, 0.5, 1.0), '-', 'results_bellman30.pickle'),
-        ('Learned prior, T=30, with noise', (0.8, 0.3, 0.3), '--', 'results_bellman30_noise01.pickle')
+        ('Learned prior, T=36', (0.3, 0.5, 1.0), '-', 'results_bellman36.pickle'),
+        ('Learned prior, T=36, with noise', (0.8, 0.3, 0.3), '--', 'results_bellman36_noise.pickle')
     ]
 
     fig_st = plt.figure(1, figsize=(6, 3))
@@ -88,7 +88,7 @@ def phase_portraits_goal_vs_rewards():
     models = [
         ('Given prior, T=60', 'model_normal60.pt', 'settings_normal60.pk'),
         ('Given prior, T=90', 'model_normal90.pt', 'settings_normal90.pk'),
-        ('Learned prior, T=30', 'model_bellman30.pt', 'settings_bellman30.pk'),
+        ('Learned prior, T=36', 'model_bellman36.pt', 'settings_bellman36.pk'),
     ]
 
     fig = plt.figure(figsize=(8, 2.4))
@@ -118,8 +118,8 @@ def phase_portraits_goal_vs_rewards():
 
 
 def observations_and_policy_noise():
-    model_file = 'model_bellman30_noise01.pt'
-    settings_file = 'settings_bellman30_noise01.pk'
+    model_file = 'model_bellman36_noise.pt'
+    settings_file = 'settings_bellman36_noise.pk'
 
     fig = plt.figure(figsize=(7, 2.2))
     ax_obs = fig.gca()
@@ -159,6 +159,6 @@ def observations_and_policy_noise():
 
 if __name__ == '__main__':
     # goal_vs_rewards()
-    # clean_vs_noise()
     # phase_portraits_goal_vs_rewards()
+    # clean_vs_noise()
     observations_and_policy_noise()

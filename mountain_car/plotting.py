@@ -95,14 +95,15 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
                 else:
                     kl_extrinsic[i, j] = agent.kl_extrinsic(torch.stack((sample_positions[j], sample_velocities[i]))).sum()
 
-    clev = torch.linspace(kl_extrinsic.min().item(), kl_extrinsic.max().item(), 100)
-    cs = axis.contourf(sample_positions.expand((grid_points, grid_points)), sample_velocities.expand((grid_points, grid_points)).transpose(1, 0), kl_extrinsic, clev, cmap='magma')
+    kl_bar_max = 1.0 if kl_extrinsic.max() < 1.5 else 2.0
+    clev = torch.linspace(0.0, max(kl_bar_max, kl_extrinsic.max().item()), 100)
+    cs = axis.contourf(sample_positions.expand((grid_points, grid_points)), sample_velocities.expand((grid_points, grid_points)).transpose(1, 0), kl_extrinsic, clev, cmap='magma_r')
     for c in cs.collections:
         c.set_rasterized(True)
 
     divider = make_axes_locatable(axis)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(cs, cax=cax, ticks=torch.linspace(kl_extrinsic.min().item(), kl_extrinsic.max().item(), 6))
+    cbar = fig.colorbar(cs, cax=cax, ticks=torch.linspace(0.0, kl_bar_max, 5))
     if label_cbar:
         cbar.set_label('KL extr.')
 
@@ -126,12 +127,12 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
             perceived_locs = agent.logged_history.get_frame(times_predictions[j])['perceived_locs']
             # pred_locs = torch.stack(pred_locs)
             pred_obs = agent.vae.decode(torch.cat([perceived_locs.unsqueeze(0), pred_locs])).detach()
-            axis.plot(pred_obs[:, 0], pred_obs[:, 1], color=(0.0, 1.0, 0.0), alpha=0.5, linewidth=0.5, label='Perceived latent' if j == 1 else None)
+            axis.plot(pred_obs[:, 0], pred_obs[:, 1], color=(0.0, 0.9, 0.0), alpha=0.5, linewidth=0.5, label='Perceived latent' if j == 1 else None)
 
     # 3) Plot goal box
     x1, y1 = observations_mapper(torch.tensor((0.45, 0.0)))  # thresholds for mountain-car goal, transformed to problem coordinates
     x2, y2 = 1.0, 1.0
-    axis.add_patch(patches.Polygon([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], edgecolor='k', facecolor=(0.0, 1.0, 0.0), linestyle='--', alpha=0.5))
+    axis.add_patch(patches.Polygon([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], edgecolor='k', facecolor=(0.6, 0.6, 0.6), linestyle='--', alpha=0.5))
 
     axis.set_xlabel('Horizontal position')
     axis.set_ylabel('Velocity', labelpad=-3)

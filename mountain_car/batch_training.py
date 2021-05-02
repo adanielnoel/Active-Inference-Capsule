@@ -9,22 +9,22 @@ import torch.distributions as distr
 
 from mountain_car.training import run_training
 from models.vae_dense_obs import DenseObservation_VAE
-from models.biased_model import BiasedModelBellman
+from models.prior_model import PriorModelBellman
 
 num_simulations = 15
 max_cpus = None
 num_episodes = 150
 save_models = False
 experiment_dir = './experiments/batch_run/'
-name = 'results_bellman30_noise01'
+name = 'results_bellman36_noise'
 _learn_biased_model = True
 _include_cart_velocity = True
 _observation_noise_std = 0.1
 _time_compression = 6
-_planning_horizon = 5  # Multiply with _time_compression to get in simulation steps
+_planning_horizon = 6  # Multiply with _time_compression to get in simulation steps
 
 if _learn_biased_model:
-    biased_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, iterate_train=10, discount_factor=0.995)
+    biased_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
 else:
     biased_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
 

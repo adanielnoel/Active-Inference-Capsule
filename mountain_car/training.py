@@ -10,36 +10,37 @@ import tqdm
 
 from models.vae_dense_obs import DenseObservation_VAE
 from models.active_inference_capsule import ActiveInferenceCapsule
-from models.biased_model import BiasedModelBellman
+from models.prior_model import PriorModelBellman
 from utils.timeline import Timeline
 from utils.value_map import ValueMap
 from utils.model_saving import load_capsule_parameters
 import mountain_car.plotting as plots
 
+
 # Note: scroll to bottom for running as script
 
-
-def run_training(agent_parameters,              # Agent parameters
-                 time_compression,              # Simulation parameter
-                 observation_noise_std=None,    # Simulation parameter
-                 include_cart_velocity=True,    # Simulation parameter
-                 model_id=None,                 # Simulation parameter - use to manage multiple independent models in the same folder
-                 episodes=1,                    # Job setting
-                 episode_callbacks=(),          # Job setting
-                 frame_callbacks=(),            # Job setting
-                 save_dirpath=None,             # Job setting
-                 model_load_filepath=None,      # Job setting
-                 save_all_episodes=False,       # Job setting
-                 load_vae=True,                 # Job setting
-                 load_transition_model=True,    # Job setting
-                 load_biased_model=True,        # Job setting
-                 train_parameters=True,         # Job setting
-                 verbose=True,                  # Job setting
-                 display_simulation=False):     # Job setting
+def run_training(agent_parameters,  # Agent parameters
+                 time_compression,  # Simulation parameter
+                 observation_noise_std=None,  # Simulation parameter
+                 include_cart_velocity=True,  # Simulation parameter
+                 model_id=None,  # Simulation parameter - use to manage multiple independent models in the same folder
+                 episodes=1,  # Job setting
+                 episode_callbacks=(),  # Job setting
+                 frame_callbacks=(),  # Job setting
+                 save_dirpath=None,  # Job setting
+                 model_load_filepath=None,  # Job setting
+                 save_all_episodes=False,  # Job setting
+                 load_vae=True,  # Job setting
+                 load_transition_model=True,  # Job setting
+                 load_biased_model=True,  # Job setting
+                 train_parameters=True,  # Job setting
+                 verbose=True,  # Job setting
+                 display_simulation=False):  # Job setting
 
     env = gym.make('MountainCarContinuous-v0').env
     observations_mapper = ValueMap(in_min=torch.tensor((-1.2, -0.07)), in_max=torch.tensor((0.6, 0.07)),
                                    out_min=torch.tensor((-1.0, -1.0)), out_max=torch.tensor((1.0, 1.0)))
+    rewards_mapper = ValueMap(in_min=-100, in_max=100, out_min=-1, out_max=1)
     aif_agent = ActiveInferenceCapsule(**agent_parameters)
 
     if save_dirpath is not None:
@@ -96,12 +97,13 @@ def run_training(agent_parameters,              # Agent parameters
             t = i + 1
             observation, reward, done, _ = env.step(action)
             observation = observations_mapper(torch.from_numpy(observation).float())
+            reward = rewards_mapper(reward)
             episode_history.log(t, 'true_observations', observation)
             episode_history.log(t - 1, 'true_actions', action)
             obs_noise = observation if observation_noise_std is None else observation + torch.normal(0.0, torch.tensor(observation_noise_std))
             episode_history.log(t, 'noisy_observations', obs_noise)
             if i % time_compression == 0:
-                action = aif_agent.step(t, obs_noise if include_cart_velocity else obs_noise[[0]], action)
+                action = aif_agent.step(t, obs_noise if include_cart_velocity else obs_noise[[0]], action, reward)
                 action = np.clip(action, env.min_action, env.max_action)
             total_reward += reward
 
@@ -114,6 +116,8 @@ def run_training(agent_parameters,              # Agent parameters
                                 frame=frame))
 
             if done:
+                if i % time_compression != 0:   # if last state did not fall in the update, update anyways
+                    aif_agent.step(t, obs_noise if include_cart_velocity else obs_noise[[0]], action=None, reward=reward)
                 iterator.set_postfix_str(f'reward={total_reward:.2f}')
                 break
             elif i == max_episode_steps - 1:
@@ -126,8 +130,6 @@ def run_training(agent_parameters,              # Agent parameters
                             episode_history=episode_history,
                             observations_mapper=observations_mapper))
 
-        if total_reward > 0:
-            aif_agent.learn_biased_model()  # Train biased model with the successful trajectory
         if save_dirpath is not None and train_parameters:
             torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_{episode + 1:03d}.pt'))
         VFE, expected_FEEF = aif_agent.logged_history.select_features(['VFE', 'expected_FEEF'])[1]
@@ -141,21 +143,22 @@ def run_training(agent_parameters,              # Agent parameters
 
 
 if __name__ == '__main__':
-    _display_plots = False
-    _load_existing = False
+    _display_plots = True
+    _load_existing = True
     experiment_dir = './experiments/single_run/'
     _learn_biased_model = True
     _include_cart_velocity = True
     _observation_noise_std = 0.1
     _time_compression = 6
-    _planning_horizon = 5  # Multiply with _time_compression to get in simulation steps
+    _planning_horizon = 6  # Multiply with _time_compression to get in simulation steps
 
     if _learn_biased_model:
-        biased_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, iterate_train=10, discount_factor=0.995)
+        biased_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
     else:
         biased_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
 
     from time import time
+
     t0 = time()
     res = run_training(
         agent_parameters=dict(
@@ -175,11 +178,12 @@ if __name__ == '__main__':
             # disable_kl_intrinsic=True   # Uncomment for ablation study
         ),
         time_compression=_time_compression,
-        episodes=200,
+        episodes=400,
         observation_noise_std=_observation_noise_std,
         include_cart_velocity=_include_cart_velocity,
         model_id=None,
-        episode_callbacks=[plots.show_FEEF_vs_FE, plots.show_phase_portrait, plots.show_prediction_vs_outcome] if _display_plots else [],
+        # episode_callbacks=[plots.show_phase_portrait, plots.show_prediction_vs_outcome] if _display_plots else [],
+        episode_callbacks=[plots.show_phase_portrait] if _display_plots else [],
         frame_callbacks=(),
         save_dirpath=experiment_dir,
         save_all_episodes=False,
