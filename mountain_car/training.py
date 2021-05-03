@@ -32,7 +32,7 @@ def run_training(agent_parameters,  # Agent parameters
                  save_all_episodes=False,  # Job setting
                  load_vae=True,  # Job setting
                  load_transition_model=True,  # Job setting
-                 load_biased_model=True,  # Job setting
+                 load_prior_model=True,  # Job setting
                  train_parameters=True,  # Job setting
                  verbose=True,  # Job setting
                  display_simulation=False):  # Job setting
@@ -61,12 +61,12 @@ def run_training(agent_parameters,  # Agent parameters
 
     # Load previous model
     if model_load_filepath is not None:
-        load_capsule_parameters(aif_agent, model_load_filepath, load_vae, load_transition_model, load_biased_model)
+        load_capsule_parameters(aif_agent, model_load_filepath, load_vae, load_transition_model, load_prior_model)
         if verbose:
             loaded_models = []
             loaded_models += ['vae'] if load_vae else []
             loaded_models += ['transition_model'] if load_transition_model else []
-            loaded_models += ['biased_model'] if load_biased_model and not isinstance(aif_agent.biased_model, distr.Normal) else []
+            loaded_models += ['prior_model'] if load_prior_model and not isinstance(aif_agent.prior_model, distr.Normal) else []
             print(f"\nLoaded <{', '.join(loaded_models)}> from previous save at <{model_load_filepath}>")
 
     if save_dirpath is not None and train_parameters:
@@ -143,19 +143,19 @@ def run_training(agent_parameters,  # Agent parameters
 
 
 if __name__ == '__main__':
-    _display_plots = True
-    _load_existing = True
+    _display_plots = False
+    _load_existing = False
     experiment_dir = './experiments/single_run/'
-    _learn_biased_model = True
+    _learn_prior_model = False
     _include_cart_velocity = True
-    _observation_noise_std = 0.1
+    _observation_noise_std = None
     _time_compression = 6
-    _planning_horizon = 6  # Multiply with _time_compression to get in simulation steps
+    _planning_horizon = 15  # Multiply with _time_compression to get in simulation steps
 
-    if _learn_biased_model:
-        biased_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
+    if _learn_prior_model:
+        prior_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
     else:
-        biased_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
+        prior_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
 
     from time import time
 
@@ -166,11 +166,11 @@ if __name__ == '__main__':
                 observation_dim=2 if _include_cart_velocity else 1,
                 latent_dim=2 if _include_cart_velocity else 1,
                 observation_noise_std=_observation_noise_std),
-            biased_model=biased_model,
+            prior_model=prior_model,
             policy_dim=1,
             time_step_size=_time_compression,
             planning_horizon=_planning_horizon,
-            n_policy_samples=700,
+            n_policy_samples=1500,
             policy_iterations=2,
             n_policy_candidates=70,
             action_window=2,
@@ -190,7 +190,7 @@ if __name__ == '__main__':
         model_load_filepath='./experiments/single_run/model.pt' if _load_existing else None,
         load_vae=True,
         load_transition_model=True,
-        load_biased_model=True,
+        load_prior_model=True,
         train_parameters=True,
         verbose=True,
         display_simulation=False

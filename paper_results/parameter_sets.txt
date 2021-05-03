@@ -1,6 +1,6 @@
 name = 'results_normal60'
 num_episodes = 150
-_learn_biased_model = False
+_learn_prior_model = False
 _include_cart_velocity = True
 _observation_noise_std = None
 _time_compression = 6
@@ -13,7 +13,7 @@ action_window=2
 
 name = 'results_normal90'
 num_episodes = 150
-_learn_biased_model = False
+_learn_prior_model = False
 _include_cart_velocity = True
 _observation_noise_std = None
 _time_compression = 6
@@ -26,7 +26,7 @@ action_window=2
 
 name = 'results_random'
 num_episodes = 150
-_learn_biased_model = False
+_learn_prior_model = False
 _include_cart_velocity = True
 _observation_noise_std = None # 0.08
 _time_compression = 6
@@ -39,8 +39,8 @@ action_window=2
 # > Training time ~7min
 
 name = 'results_bellman36'
-_learn_biased_model = True
-biased_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
+_learn_prior_model = True
+prior_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
 _include_cart_velocity = True
 _observation_noise_std = None
 _time_compression = 6
@@ -53,8 +53,8 @@ action_window=2
 
 
 name = 'results_bellman36_noise'
-_learn_biased_model = True
-biased_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
+_learn_prior_model = True
+prior_model = BiasedModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
 _include_cart_velocity = True
 _observation_noise_std = 0.1
 _time_compression = 6

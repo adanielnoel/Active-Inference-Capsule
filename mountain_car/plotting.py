@@ -21,9 +21,9 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
 
     # 2) Plot executed actions
     times_actions, true_actions = merged_history.select_features('true_actions')
-    pl_act = axis.plot(times_actions, true_actions, 'b', linewidth=1, label='Executed action')
+    pl_act = axis.plot(times_actions, true_actions, 'b-.', linewidth=1, label='Executed action')
 
-    axis.set_ylabel('a', color='r', rotation=0)
+    axis.set_ylabel('action', color='r', rotation=90)
     axis.tick_params(axis='y', labelcolor='r')
     axis_obs = axis.twinx()
 
@@ -38,8 +38,8 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     times_filtered, (filtered_locs, filtered_stds) = merged_history.select_features(['filtered_observations_locs', 'filtered_observations_stds'])
     locs_, stds_ = torch.stack(filtered_locs)[:, 0], torch.stack(filtered_stds)[:, 0]
     axis_obs.fill_between(times_filtered, locs_ + stds_, locs_ - stds_, color='k', alpha=0.3)
-    pl_rec = axis_obs.plot(times_filtered, locs_, 'k', linestyle='dotted', linewidth=1.0, label='filtered belief')
-    axis_obs.set_ylabel('x', rotation=0)  # we already handled the x-label with ax1
+    pl_rec = axis_obs.plot(times_filtered, locs_, 'k', linestyle='dotted', linewidth=1.0, label='Likelihood $p(y\mid x)$')
+    axis_obs.set_ylabel('position', rotation=90)  # we already handled the x-label with ax1
 
     # Make common legend for both axes
     lns = pl_act + pl_pol + pl_pos + pl_pos_noise + pl_rec
@@ -80,7 +80,7 @@ def _plot_latent_prediction(axis, latent_idx, merged_history: Timeline):
     axis.legend(loc='lower right', framealpha=0.3)
 
 
-def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_history: Timeline, observations_mapper, label_cbar=True, **kwargs):
+def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_history: Timeline, observations_mapper, label_cbar=True, show_t_goal=False, **kwargs):
     axis.set_aspect(1.0)
     grid_points = 30
     # 1) Plot heat map of extrinsic KL divergence
@@ -108,7 +108,8 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
         cbar.set_label('KL extr.')
 
     # 2) Plot trajectories
-    true_observations = torch.stack(episode_history.select_features('true_observations')[1])
+    times_true_observations, true_observations = episode_history.select_features('true_observations')
+    true_observations = torch.stack(true_observations)
     axis.plot(true_observations[:, 0], true_observations[:, 1], color=(0.5, 0.5, 1.0), linewidth=1.5)
     axis.scatter([true_observations[0, 0]], [true_observations[0, 1]], color='r')
 
@@ -137,6 +138,8 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
     axis.set_xlabel('Horizontal position')
     axis.set_ylabel('Velocity', labelpad=-3)
     axis.set_title('Phase portrait with extrinsic value')
+    if show_t_goal:
+        axis.text(0.1, -0.9, f'$\mathrm{{t_{{goal}}}}={int(times_true_observations[-1])}$', backgroundcolor=(1.0, 1.0, 1.0, 0.4))
     axis.set_xlim([-1, 1])
     axis.set_ylim([-1, 1])
     axis.grid(color=(0.5, 0.5, 0.5), alpha=0.5, linewidth=0.2)

@@ -39,6 +39,7 @@ def goal_vs_rewards():
     fig_st.gca().legend(loc='upper right', framealpha=0.5)
     fig_st.tight_layout()
     fig_st.gca().set_xlim((0, 150))
+    fig_st.gca().set_xticks([0, 25, 50, 75, 100, 125, 150])
     fig_st.gca().set_ylim((0, 1000))
     # plt.show()
 
@@ -51,14 +52,14 @@ def clean_vs_noise():
         ('Learned prior, T=36, with noise', (0.8, 0.3, 0.3), '--', 'results_bellman36_noise.pickle')
     ]
 
-    fig_st = plt.figure(1, figsize=(6, 3))
+    fig_st = plt.figure(1, figsize=(6, 2.5))
     fig_st.gca().grid(linewidth=0.4, alpha=0.5)
     fig_st.gca().axhline(200, color='k', linestyle='--', linewidth=0.5)
     fig_st.gca().set_title(f'Clean vs. noisy observations (episode length)')
     fig_st.gca().set_xlabel('Episodes')
     fig_st.gca().set_ylabel('Steps until goal')
 
-    fig_fe = plt.figure(2, figsize=(6, 3))
+    fig_fe = plt.figure(2, figsize=(6, 2.5))
     fig_fe.gca().grid(linewidth=0.4, alpha=0.5)
     fig_fe.gca().set_title(f'Clean vs. noisy observations (free energy)')
     fig_fe.gca().set_xlabel('Episodes')
@@ -75,10 +76,12 @@ def clean_vs_noise():
     fig_st.tight_layout()
     fig_fe.tight_layout()
     fig_st.gca().set_xlim((0, 150))
+    fig_st.gca().set_xticks([0, 25, 50, 75, 100, 125, 150])
     fig_st.gca().set_ylim((0, 1000))
     fig_fe.gca().set_xlim((0, 150))
+    fig_fe.gca().set_xticks([0, 25, 50, 75, 100, 125, 150])
     fig_fe.gca().set_ylim((-200, 3000))
-    plt.show()
+    # plt.show()
 
     fig_fe.savefig('./figures/clean_vs_noise_free_energy.pdf')
     fig_st.savefig('./figures/clean_vs_noise_episode_length.pdf')
@@ -102,7 +105,7 @@ def phase_portraits_goal_vs_rewards():
         # Run an episode and plot the phase portrait onto the axis
         run_training(
             **settings,
-            episode_callbacks=[lambda agent, episode_history, observations_mapper, **kwargs: _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper, label_cbar=i==2)],
+            episode_callbacks=[lambda agent, episode_history, observations_mapper, **kwargs: _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper, label_cbar=i==2, show_t_goal=True)],
             display_simulation=False,
             train_parameters=False,
             model_load_filepath=model_file,
@@ -133,6 +136,7 @@ def observations_and_policy_noise():
 
         # 1) Plot actions and states
         _plot_observations_actions(ax_obs, agent, merged_history)
+        ax_obs.set_title('Observations and policy. Learned prior, T=36, Gaussian noise')
         # _plot_latent_prediction(ax_lat1, 0, merged_history)
         # _plot_latent_prediction(ax_lat2, 1, merged_history)
 
@@ -140,7 +144,7 @@ def observations_and_policy_noise():
         settings = pickle.load(f)
 
     # Run an episode and plot the phase portrait onto the axis
-    run_training(
+    stats = run_training(
         **settings,
         episode_callbacks=[make_plot],
         display_simulation=False,
@@ -148,7 +152,7 @@ def observations_and_policy_noise():
         model_load_filepath=model_file,
     )
 
-    ax_obs.set_xlim((0, 120))
+    ax_obs.set_xlim((0, 1.5 * stats.select_features(['steps_per_episode'])[1][-1]))
     ax_obs.set_xlabel('Steps')
     # ax_lat1.set_xlim((0, 120))
     # ax_lat2.set_xlim((0, 120))
@@ -159,6 +163,6 @@ def observations_and_policy_noise():
 
 if __name__ == '__main__':
     # goal_vs_rewards()
-    # phase_portraits_goal_vs_rewards()
+    phase_portraits_goal_vs_rewards()
     # clean_vs_noise()
-    observations_and_policy_noise()
+    # observations_and_policy_noise()

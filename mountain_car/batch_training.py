@@ -17,23 +17,23 @@ num_episodes = 150
 save_models = False
 experiment_dir = './experiments/batch_run/'
 name = 'results_bellman36_noise'
-_learn_biased_model = True
+_learn_prior_model = True
 _include_cart_velocity = True
 _observation_noise_std = 0.1
 _time_compression = 6
 _planning_horizon = 6  # Multiply with _time_compression to get in simulation steps
 
-if _learn_biased_model:
-    biased_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
+if _learn_prior_model:
+    prior_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
 else:
-    biased_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
+    prior_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
 
 agent_parameters = dict(
     vae=DenseObservation_VAE(
         observation_dim=2 if _include_cart_velocity else 1,
         latent_dim=2 if _include_cart_velocity else 1,
         observation_noise_std=_observation_noise_std),
-    biased_model=biased_model,
+    prior_model=prior_model,
     policy_dim=1,
     time_step_size=_time_compression,
     planning_horizon=_planning_horizon,

@@ -15,13 +15,13 @@ def _get_sub_model_state_dict(state_dict, sub_model_path):
     return sub_model_dict
 
 
-def load_capsule_parameters(model, model_save_filepath, load_vae=True, load_transition_model=True, load_biased_model=True):
+def load_capsule_parameters(model, model_save_filepath, load_vae=True, load_transition_model=True, load_prior_model=True):
     state_dict = torch.load(model_save_filepath)
     if load_vae:
         model.vae.load_state_dict(_get_sub_model_state_dict(state_dict, 'vae'))
     if load_transition_model:
         model.transition_model.load_state_dict(_get_sub_model_state_dict(state_dict, 'transition_model'))
-    if load_biased_model and not isinstance(model.biased_model, torch.distributions.Distribution):
-        if len([key for key in state_dict.keys() if 'biased_model.' in key]) > 0:
-            model.biased_model.load_state_dict(_get_sub_model_state_dict(state_dict, 'biased_model'))
+    if load_prior_model and not isinstance(model.prior_model, torch.distributions.Distribution):
+        if len([key for key in state_dict.keys() if 'prior_model.' in key]) > 0:
+            model.prior_model.load_state_dict(_get_sub_model_state_dict(state_dict, 'prior_model'))
 

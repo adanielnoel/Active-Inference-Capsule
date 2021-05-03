@@ -12,12 +12,12 @@ from utils.timeline import Timeline
 
 class ActiveInferenceCapsule(nn.Module):
     """
-    Learns observation, transition and biased generative models, and
+    Learns observation, transition and prior  models, and
     generates policies with minimal Free Energy of the Expected Future [1].
 
     Use:
         Call step() at every time-step. The function returns the action to take next.
-        If using a learned prior, call learn_biased_model() when the goal is reached.
+        If using a learned prior, call learn_prior_model() when the goal is reached.
 
     References:
         - [1] B. Millidge et al, “Whence the Expected Free Energy?,” 2020, doi: 10.1162/neco_a_01354.
@@ -25,7 +25,7 @@ class ActiveInferenceCapsule(nn.Module):
 
     def __init__(self,
                  vae: VAE,
-                 biased_model,
+                 prior_model,
                  policy_dim: int,
                  time_step_size: float,
                  action_window: int,
@@ -33,7 +33,7 @@ class ActiveInferenceCapsule(nn.Module):
                  n_policy_samples: int,
                  policy_iterations: int,
                  n_policy_candidates: int,
-                 disable_kl_intrinsic=False,    # Use for ablation studies
+                 disable_kl_intrinsic=False,  # Use for ablation studies
                  disable_kl_extrinsic=False):   # Use for ablation studies
         super(ActiveInferenceCapsule, self).__init__()
         self.max_predicted_log_prob = 0.0
@@ -45,7 +45,7 @@ class ActiveInferenceCapsule(nn.Module):
             policy_dim=policy_dim,
             dynamic_dim=planning_horizon * vae.latent_dim * 2,  # Make large enough for representing trajectories (heuristic)
             num_rnn_layers=1)
-        self.biased_model = biased_model        # Given or learnable prior
+        self.prior_model = prior_model        # Given or learnable prior
 
         # Policy settings
         self.planning_horizon = planning_horizon
@@ -74,8 +74,8 @@ class ActiveInferenceCapsule(nn.Module):
 
     def reset_states(self):
         self.transition_model.reset_states()
-        if not isinstance(self.biased_model, distr.Distribution):
-            self.biased_model.reset_states()
+        if not isinstance(self.prior_model, distr.Distribution):
+            self.prior_model.reset_states()
         self.policy = torch.zeros((self.planning_horizon, self.policy_dim))
         self.policy_std = torch.zeros((self.planning_horizon, self.policy_dim))
         self.next_FEEFs = torch.zeros(self.planning_horizon)
@@ -109,8 +109,8 @@ class ActiveInferenceCapsule(nn.Module):
         """
         observation = observation if isinstance(observation, torch.Tensor) else torch.tensor(observation, dtype=torch.float32).view(-1)
         self.logged_history.log(time, 'perceived_observations', observation)
-        if not isinstance(self.biased_model, distr.Distribution):
-            self.biased_model.learn(observation, reward)
+        if not isinstance(self.prior_model, distr.Distribution):
+            self.prior_model.learn(observation, reward)
 
         action = action if isinstance(action, torch.Tensor) or action is None else torch.tensor(action, dtype=torch.float32)
         if action is not None:
@@ -171,11 +171,11 @@ class ActiveInferenceCapsule(nn.Module):
         return action
 
     def kl_extrinsic(self, y):
-        if isinstance(self.biased_model, distr.Normal):
-            kl_extrinsic = distr.kl_divergence(distr.Normal(y, 1.0), self.biased_model).sum(dim=-1)  # Sum over components, keep time-steps and batches
+        if isinstance(self.prior_model, distr.Normal):
+            kl_extrinsic = distr.kl_divergence(distr.Normal(y, 1.0), self.prior_model).sum(dim=-1)  # Sum over components, keep time-steps and batches
         else:
             # Surrogate for non-random modelled priors
-            kl_extrinsic = self.biased_model.extrinsic_kl(y).sum(dim=-1)  # Sum over components, keep time-steps and batches
+            kl_extrinsic = self.prior_model.extrinsic_kl(y).sum(dim=-1)  # Sum over components, keep time-steps and batches
         return kl_extrinsic
 
     def _forward_policies(self, policies: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor):
@@ -243,7 +243,7 @@ class ActiveInferenceCapsule(nn.Module):
         qx_y.scale.detach_()
         return VFE.detach(), qx_y
 
-    # def learn_biased_model(self, reward):
-    #     if not isinstance(self.biased_model, distr.Distribution):
+    # def learn_prior_model(self, reward):
+    #     if not isinstance(self.prior_model, distr.Distribution):
     #         _, po = self.logged_history.select_features('perceived_observations')
-    #         self.biased_model.learn(torch.stack(po), reward)
+    #         self.prior_model.learn(torch.stack(po), reward)
