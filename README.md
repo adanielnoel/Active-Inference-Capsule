@@ -1,6 +1,7 @@
 # Active Inference Capsule
 
-![video_agent.gif]()
+![video_agent](https://user-images.githubusercontent.com/33813179/119155212-38a01800-ba53-11eb-880c-1a6e65974b8f.gif)
+
 
 ## Requirements
 - Python 3.5+
