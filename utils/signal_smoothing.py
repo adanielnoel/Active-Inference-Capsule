@@ -3,7 +3,7 @@ import numpy
 # Code from https://scipy-cookbook.readthedocs.io/items/SignalSmooth.html
 
 
-def smooth(x, window_len=15, window='hanning'):
+def smooth(x, window_len=0, window='hanning'):
     """smooth the data using a window with requested size.
 
     This method is based on the convolution of a scaled window with the signal.

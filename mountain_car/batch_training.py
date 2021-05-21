@@ -16,12 +16,12 @@ max_cpus = None
 num_episodes = 150
 save_models = False
 experiment_dir = './experiments/batch_run/'
-name = 'results_bellman36_noise'
+name = 'results_learned_prior_H5_noise'
 _learn_prior_model = True
 _include_cart_velocity = True
 _observation_noise_std = 0.1
 _time_compression = 6
-_planning_horizon = 6  # Multiply with _time_compression to get in simulation steps
+_planning_horizon = 5  # Multiply with _time_compression to get in simulation steps
 
 if _learn_prior_model:
     prior_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
@@ -40,7 +40,9 @@ agent_parameters = dict(
     n_policy_samples=700,
     policy_iterations=2,
     n_policy_candidates=70,
-    action_window=2
+    action_window=2,
+    # use_kl_intrinsic=False,  # Uncomment for ablation study
+    # use_kl_extrinsic=False   # Uncomment for ablation study
 )
 
 
@@ -51,6 +53,7 @@ def run_training_process(training_id):
         episode_callbacks=[],
         save_dirpath=experiment_dir if save_models else None,
         episodes=num_episodes,
+        # hot_start_episodes=25,
         observation_noise_std=_observation_noise_std,
         include_cart_velocity=_include_cart_velocity,
         model_id=training_id,

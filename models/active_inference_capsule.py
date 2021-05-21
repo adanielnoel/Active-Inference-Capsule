@@ -33,8 +33,8 @@ class ActiveInferenceCapsule(nn.Module):
                  n_policy_samples: int,
                  policy_iterations: int,
                  n_policy_candidates: int,
-                 disable_kl_intrinsic=False,  # Use for ablation studies
-                 disable_kl_extrinsic=False):   # Use for ablation studies
+                 use_kl_intrinsic=True,  # Use for ablation studies
+                 use_kl_extrinsic=True):   # Use for ablation studies
         super(ActiveInferenceCapsule, self).__init__()
         self.max_predicted_log_prob = 0.0
 
@@ -53,8 +53,8 @@ class ActiveInferenceCapsule(nn.Module):
         self.policy_iterations = policy_iterations
         self.n_policy_candidates = n_policy_candidates
         self.action_window = action_window
-        self.use_kl_intrinsic = not disable_kl_intrinsic
-        self.use_kl_extrinsic = not disable_kl_extrinsic
+        self.use_kl_intrinsic = use_kl_intrinsic
+        self.use_kl_extrinsic = use_kl_extrinsic
 
         # Short-term memory
         self.policy = None

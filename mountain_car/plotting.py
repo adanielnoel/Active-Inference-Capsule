@@ -42,7 +42,7 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     axis_obs.set_ylabel('position', rotation=90)  # we already handled the x-label with ax1
 
     # Make common legend for both axes
-    lns = pl_act + pl_pol + pl_pos + pl_pos_noise + pl_rec
+    lns = pl_pol + pl_act + pl_pos + pl_pos_noise + pl_rec
     labs = [ln.get_label() for ln in lns]
     axis.legend(lns, labs, loc='lower right', framealpha=0.4)
     axis.set_ylim((-2.5, 2.5))
@@ -168,7 +168,7 @@ def show_phase_portrait(agent: ActiveInferenceCapsule, episode_history: Timeline
     fig = plt.figure(figsize=(5, 4))
     axis = fig.gca()
     _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper)
-    axis.set_title('Given prior, T=90')
+    axis.set_title('Given prior, H=90')
     fig.tight_layout()
     plt.savefig('phase_portrait.pdf')
     plt.show()
@@ -190,29 +190,28 @@ def show_FEEF_vs_FE(agent: ActiveInferenceCapsule, **kwargs):
     plt.close()
 
 
-def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-'):
+def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, ax=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-', alpha=0.3, smoothing=0, hotstart_tmlns=None):
     timelines = [timelines] if isinstance(timelines, Timeline) else timelines
     all_rewards = []
     times = None
     for timeline in timelines:
-        times, rewards = timeline.select_features('steps_per_episode')
-        all_rewards.append(rewards)
+        times, durations = timeline.select_features('steps_per_episode')
+        all_rewards.append(durations)
 
     all_rewards = np.array(all_rewards)
-    r_mean = smooth(all_rewards.mean(0))
+    r_mean = smooth(all_rewards.mean(0), smoothing)
     r_std = all_rewards.std(0)
-    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_rewards.max(0))]))
-    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_rewards.min(0))]))
+    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_rewards.max(0))]), smoothing)
+    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_rewards.min(0))]), smoothing)
 
-    fig = figure or plt.figure(figsize=(6, 4))
-    ax = fig.gca()
+    ax = ax or plt.figure(figsize=(6, 4)).gca()
     if len(all_rewards) > 1:
-        ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax.plot(times, r_mean, color=color, linestyle=linestyle, linewidth=1.0, label=label)
+        ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=alpha)
+    ax.plot(times, r_mean, color=[color[0]*0.75, color[1]*0.75, color[2]*0.75], linestyle=linestyle, linewidth=1.0, label=label)
     ax.set_yticks([0, 70, 200, 400, 600, 800, 1000])
     ax.set_ylim((0, 1000.0))
 
-    if figure is None:
+    if ax is None:
         plt.grid(linewidth=0.4, alpha=0.5)
         plt.axhline(200, color='k', linestyle='--', linewidth=0.5)
         plt.suptitle(f'Mountain car. Statistics of {len(timelines)} agents', y=0.94)
@@ -224,10 +223,10 @@ def plot_training_history(timelines: Union[Timeline, List[Timeline]], save_path=
             plt.show()
         plt.close()
     else:
-        return fig
+        return ax
 
 
-def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, figure=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-'):
+def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_path=None, show=True, ax=None, label=None, color=(0.2, 0.4, 1.0), linestyle='-', smoothing=0):
     timelines = [timelines] if isinstance(timelines, Timeline) else timelines
     all_free_energies = []
     times = None
@@ -236,30 +235,29 @@ def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_p
         all_free_energies.append(free_energy)
 
     all_free_energies = np.array(all_free_energies)
-    r_mean = smooth(all_free_energies.mean(0))
+    r_mean = smooth(all_free_energies.mean(0), smoothing)
     r_std = all_free_energies.std(0)
-    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_free_energies.max(0))]))
-    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_free_energies.min(0))]))
+    r_max = smooth(np.array([min(a, b) for a, b in zip(r_mean + r_std, all_free_energies.max(0))]), smoothing)
+    r_min = smooth(np.array([max(a, b) for a, b in zip(r_mean - r_std, all_free_energies.min(0))]), smoothing)
 
-    fig = figure or plt.figure(figsize=(6, 4))
-    ax = fig.gca()
+    ax = ax or plt.figure(figsize=(6, 4)).gca()
     if len(all_free_energies) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
     ax.plot(times, r_mean, color=color, linestyle=linestyle, linewidth=1.0, label=label)
 
-    if figure is None:
+    if ax is None:
         plt.grid(linewidth=0.4, alpha=0.5)
         plt.axhline(200, color='k', linestyle='--', linewidth=0.5)
         plt.suptitle(f'Mountain car. Statistics of {len(timelines)} agents', y=0.94)
         plt.xlabel('Episodes')
-        plt.ylabel('Episode cumulative free energy')
+        plt.ylabel('Cumulative free energy')
         if os.path.exists(os.path.dirname(save_path)):
             plt.savefig(save_path)
         if show:
             plt.show()
         plt.close()
     else:
-        return fig
+        return ax
 
 
 def plot_cumulative_free_energies(timeline: Timeline):

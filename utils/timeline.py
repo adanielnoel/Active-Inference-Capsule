@@ -52,6 +52,11 @@ class Timeline:
         else:
             return times, values
 
+    def delete_feature(self, key):
+        for time in self.times:
+            if key in list(self.tml[time].keys()):
+                del self.tml[time][key]
+
     def merge(self, other: 'Timeline'):
         new_times = sorted(list(set(self.times + other.times)))
         self_dt = self.times[-1] - self.times[-2]
