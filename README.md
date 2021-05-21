@@ -1,6 +1,6 @@
 # Active Inference Capsule
 
-![paper_results/video_learned_prior_H5.mp4]()
+![video_agent.gif]()
 
 ## Requirements
 - Python 3.5+
