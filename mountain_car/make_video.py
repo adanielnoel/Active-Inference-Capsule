@@ -24,7 +24,7 @@ if not os.path.exists(frames_path):
 # Callback function to draw each episode frame
 def save_video_frame(agent, episode_history, observations_mapper, frame, **kwargs):
     fig = plots.make_video_frame(agent, episode_history, frame, observations_mapper)
-    if model_name[-4] == '_':
+    if model_name[-4] == '_':   # the model contains the episode number
         fig.subplots_adjust(top=0.88)
         fig.suptitle(f'Episode {int(model_name[-3:])}', y=0.98)
     fig.savefig(os.path.join(frames_path, f'frame_{len(episode_history.times):04d}.png'), dpi=200)
@@ -41,13 +41,13 @@ if __name__ == '__main__':
     # Load model and simulation settings
     with open(os.path.join(os.path.dirname(model_path), 'settings.pk'), 'rb') as f:
         settings = pickle.load(f)
-
+    settings['observation_noise_std'] = settings['observation_noise_std'] or 0.05  # When noise is None, set it to 0.05 for display
     # Run the episode, rendering and saving each frame
     run_training(
         **settings,
         frame_callbacks=[save_video_frame],
         display_simulation=True,
-        train_parameters=True,
+        train_parameters=False,
         model_load_filepath=model_path
     )
 

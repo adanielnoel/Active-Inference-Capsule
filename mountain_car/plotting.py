@@ -36,8 +36,11 @@ def _plot_observations_actions(axis, agent: ActiveInferenceCapsule, merged_histo
     pl_pos_noise = axis_obs.plot(times_noisy_observations, noisy_observations[:, 0], color='k', linestyle='--', linewidth=1.0, label='noisy observation')
     # 4) Plot expected observations
     times_filtered, (filtered_locs, filtered_stds) = merged_history.select_features(['filtered_observations_locs', 'filtered_observations_stds'])
-    locs_, stds_ = torch.stack(filtered_locs)[:, 0], torch.stack(filtered_stds)[:, 0]
-    axis_obs.fill_between(times_filtered, locs_ + stds_, locs_ - stds_, color='k', alpha=0.3)
+    if len(times_filtered) > 0:
+        locs_, stds_ = torch.stack(filtered_locs)[:, 0], torch.stack(filtered_stds)[:, 0]
+        axis_obs.fill_between(times_filtered, locs_ + stds_, locs_ - stds_, color='k', alpha=0.3)
+    else:
+        locs_ = []
     pl_rec = axis_obs.plot(times_filtered, locs_, 'k', linestyle='dotted', linewidth=1.0, label='Likelihood $p(y\mid x)$')
     axis_obs.set_ylabel('position', rotation=90)  # we already handled the x-label with ax1
 
@@ -243,7 +246,7 @@ def plot_training_free_energy(timelines: Union[Timeline, List[Timeline]], save_p
     ax = ax or plt.figure(figsize=(6, 4)).gca()
     if len(all_free_energies) > 1:
         ax.fill_between(times, r_min, r_max, color=color, linewidth=0, alpha=0.3)
-    ax.plot(times, r_mean, color=color, linestyle=linestyle, linewidth=1.0, label=label)
+    ax.plot(times, r_mean, color=[color[0]*0.75, color[1]*0.75, color[2]*0.75], linestyle=linestyle, linewidth=1.0, label=label)
 
     if ax is None:
         plt.grid(linewidth=0.4, alpha=0.5)
@@ -274,7 +277,7 @@ def plot_cumulative_free_energies(timeline: Timeline):
 
 
 def make_video_frame(agent: ActiveInferenceCapsule, episode_history: Timeline, render, observations_mapper):
-    fig = plt.figure(figsize=(6, 4.5))
+    fig = plt.figure(figsize=(6, 5))
     gs = fig.add_gridspec(5, 2)
     ax_phase = fig.add_subplot(gs[:3, 0])
     ax_frame = fig.add_subplot(gs[:3, 1])
@@ -290,7 +293,7 @@ def make_video_frame(agent: ActiveInferenceCapsule, episode_history: Timeline, r
     ax_frame.get_yaxis().set_visible(False)
 
     ax_action = _plot_observations_actions(ax_action, agent, episode_history.merge(agent.logged_history))
-    ax_action.set_xlim((0, 1000))
+    ax_action.set_xlim((0, 140))
     fig.tight_layout()
 
     # plt.show()

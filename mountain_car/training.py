@@ -158,8 +158,8 @@ if __name__ == '__main__':
     _learn_prior_model = True
     _include_cart_velocity = True
     _observation_noise_std = 0.1
-    _time_compression = 6
-    _planning_horizon = 5  # Multiply with _time_compression to get in simulation steps
+    _time_compression = 3
+    _planning_horizon = 10  # Multiply with _time_compression to get in simulation steps
 
     if _learn_prior_model:
         prior_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
@@ -182,12 +182,12 @@ if __name__ == '__main__':
             n_policy_samples=700,
             policy_iterations=2,
             n_policy_candidates=70,
-            action_window=2,
+            action_window=1,
             # use_kl_intrinsic=False,  # Uncomment for ablation study
             # use_kl_extrinsic=False   # Uncomment for ablation study
         ),
         time_compression=_time_compression,
-        episodes=300,
+        episodes=200,
         observation_noise_std=_observation_noise_std,
         include_cart_velocity=_include_cart_velocity,
         model_id=None,

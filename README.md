@@ -1,5 +1,7 @@
 # Active Inference Capsule
 
+![paper_results/video_learned_prior_H5.mp4]()
+
 ## Requirements
 - Python 3.5+
 - Pytorch (tested on 1.4.0)
@@ -19,7 +21,7 @@ The training routine is implemented in the script `mountain_car/training.py`. Th
 
 ## Training a batch of agents
 Many independent agents can be trained simultaneously with the script `mountain_car/batch_training.py`. By default, this will try to use all available CPUs, which can be changed setting `max_cpus = #`.
-The routine spawns multiple simulations in parallel and saves the results to a `.pickle` file. Interesting parameter sets can be found in the file `paper_results/parameter_sets.txt`. The results of these parameter sets are already saved in `mountain_car/experiments/batch_run/` for convenience.
+The routine spawns multiple simulations in parallel and saves the results to a `.pickle` file. Interesting parameter sets can be found in the file `paper_results/parameter_sets.py`. The results of these parameter sets are already saved in `paper_results/` for convenience.
 
 - To train a batch of agents, set the desired parameters and run the script. This will save the results after every agent that finishes training, typically in `mountain_car/experiments/batch_run/`.
 - To plot training statistics, run the script `mountain_car/plot_multiple_trainings.py`. In it, you can specify which results to plot. 
