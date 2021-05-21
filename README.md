@@ -1,6 +1,8 @@
 # Active Inference Capsule
+Introducing a new method for solving sparse-reward RL problems online through active inference.
+Submitted at NeurIPS2021.
 
-![video_agent](https://user-images.githubusercontent.com/33813179/119155212-38a01800-ba53-11eb-880c-1a6e65974b8f.gif)
+<img src="https://user-images.githubusercontent.com/33813179/119155212-38a01800-ba53-11eb-880c-1a6e65974b8f.gif" width="400">
 
 
 ## Requirements
