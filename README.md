@@ -44,6 +44,8 @@ First, train a single agent. With the option `--save_all_episodes=True` when tra
 
 This will start saving individual frames in a subdirectory of `save_dirpath`. When the agent reaches the goal, it will call `ffmpeg` to generate a `.mp4` file.
 
+This process is much slower than training because `matplotlib` takes quite some time to render each frame.
+
 ## Other
 A full list of command-line options can be found in `run_capsule_mountain_car.py`
 
