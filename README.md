@@ -1,35 +1,47 @@
 # Active Inference Capsule
-Introducing a new method for solving sparse-reward RL problems online through active inference.
-Submitted at NeurIPS2021.
+Repository for the paper **Online reinforcement learning with sparse rewards through an active inference capsule**, submitted to NeurIPS2021.
 
 <img src="https://user-images.githubusercontent.com/33813179/119155212-38a01800-ba53-11eb-880c-1a6e65974b8f.gif" width="400">
 
 
 ## Requirements
-- Python 3.5+
-- Pytorch (tested on 1.4.0)
-- numpy
-- gym
-- tqdm
-- matplotlib
-- ffmpeg (only if generating videos)
+- `Python` 3.5+
+- `Pytorch` (tested on 1.4.0)
+- `numpy`
+- `gym`
+- `tqdm`
+- `matplotlib`
+- `ffmpeg` (only if generating videos)
 
 ---
 
 ## Training a single agent
-The training routine is implemented in the script `mountain_car/training.py`. The parameters are at the bottom of the file. This file contains the `run_training()` routine which is used by other scripts. Only modify the parameters after `if __name__ == '__main__'`.
+```
+> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/'
+```
+This will train a single agent and save the model in `./paper_results/simulation_results/`
 
-- To train a new agent, set `_display_plots = False` and `_load_existing = False`. This will save the model after every episode, typically in `mountain_car/experiments/single_run/model.pt`.
-- To plot results, set `_display_plots = True` and `_load_existing = True` and run again.
+By default, the training progress will be printed. There are setting files for other agents in `./paper_results`
 
 ## Training a batch of agents
-Many independent agents can be trained simultaneously with the script `mountain_car/batch_training.py`. By default, this will try to use all available CPUs, which can be changed setting `max_cpus = #`.
-The routine spawns multiple simulations in parallel and saves the results to a `.pickle` file. Interesting parameter sets can be found in the file `paper_results/parameter_sets.py`. The results of these parameter sets are already saved in `paper_results/` for convenience.
+```
+> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --batch_agents=30
+```
+This will train 30 agents and save the models and training statistics in `./paper_results/simulation_results/`
 
-- To train a batch of agents, set the desired parameters and run the script. This will save the results after every agent that finishes training, typically in `mountain_car/experiments/batch_run/`.
-- To plot training statistics, run the script `mountain_car/plot_multiple_trainings.py`. In it, you can specify which results to plot. 
+By default, this will use all available CPU cores. It can be changed by the option `--max_cpu`.
+
+The results can be visualized using the script `./mountain_car/plot_multiple_trainings.py`
 
 ## Generating a video
-- First, train a single agent. Note: in `mountain_car/training.py` you can specify `save_all_episodes=True`, which will save a model per episode instead of overriding the previous one.
-- Specify the path to the desired model in `mountain_car/make_video.py` and run it. This will start saving individual frames, typically in a subdirectory in `mountain_car/experiments/single_run/`. When the agent reaches the goal, it will call `ffmpeg` to generate an `mp4` file.
+First, train a single agent. Note: the option `--save_all_episodes=True` will save a model per episode instead of overriding the previous one. This way you can make videos of different episodes of the same agent.
+
+```
+> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --make_video=True --model_load_filepath='./paper_results/simulation_results/model_learned_prior_H5.pt'
+```
+
+This will start saving individual frames in a subdirectory of `save_dirpath`. When the agent reaches the goal, it will call `ffmpeg` to generate an `mp4` file.
+
+## Other
+A full list of command-line options can be found in `run_capsule_mountain_car.py`
 

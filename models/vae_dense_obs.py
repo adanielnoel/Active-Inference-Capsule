@@ -25,7 +25,7 @@ class Enc(nn.Module):
 class Dec(nn.Module):
     def __init__(self, observation_dim, latent_dim, observation_noise_std=None):
         super(Dec, self).__init__()
-        if observation_noise_std is None:
+        if observation_noise_std is None or observation_noise_std is False:
             self.observation_noise_std = torch.full([observation_dim], 0.05)
         elif isinstance(observation_noise_std, float):
             self.observation_noise_std = torch.full([observation_dim], observation_noise_std)
@@ -33,7 +33,7 @@ class Dec(nn.Module):
             assert len(observation_noise_std) == observation_dim
             self.observation_noise_std = torch.tensor(observation_noise_std, dtype=torch.float32)
         else:
-            raise TypeError('Expected None, float, tuple, list or torch.Tensor for observation_noise_std')
+            raise TypeError('Expected None, False, float, tuple, list or torch.Tensor for observation_noise_std')
 
         self.dec = nn.Sequential(
             nn.Linear(latent_dim, latent_dim * 10),

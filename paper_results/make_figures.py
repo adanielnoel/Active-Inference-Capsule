@@ -1,13 +1,12 @@
 import pickle
-import os
 
 import matplotlib.pyplot as plt
 
 from mountain_car.plotting import plot_training_history, plot_training_free_energy, _plot_phase_portrait, _plot_observations_actions, _plot_latent_prediction
-from mountain_car.training import run_training
+from mountain_car.training import args_to_simulation_settings, run_training
 from models.active_inference_capsule import ActiveInferenceCapsule
 from utils.timeline import Timeline
-
+from utils.args_class import Args
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -18,11 +17,11 @@ plt.rcParams.update({
 
 def goal_vs_rewards():
     results = [
-        ('Random agent', (190/255, 190/255, 190/255), 'dotted', 'results_random.pickle'),
-        ('Given prior, H=15', (255/255, 35/255, 100/255), '--', 'results_given_prior_H15.pickle'),
-        ('Given prior, H=10', (203/255, 161/255, 39/255), '-.', 'results_given_prior_H10.pickle'),
-        ('Learned prior, H=10', (100/255, 180/255, 255/255), (0, (3, 1, 1, 1, 1, 1)), 'results_learned_prior_H10.pickle'),
-        ('Learned prior, H=5', (210/255, 100/255, 255/255), '-', 'results_learned_prior_H5.pickle'),
+        ('Random agent', (190 / 255, 190 / 255, 190 / 255), 'dotted', './simulation_results/results_random_agent.pickle'),
+        ('Given prior, H=15', (255 / 255, 35 / 255, 100 / 255), '--', './simulation_results/results_given_prior_H15.pickle'),
+        ('Given prior, H=10', (203 / 255, 161 / 255, 39 / 255), '-.', './simulation_results/results_given_prior_H10.pickle'),
+        ('Learned prior, H=10', (100 / 255, 180 / 255, 255 / 255), (0, (3, 1, 1, 1, 1, 1)), './simulation_results/results_learned_prior_H10.pickle'),
+        ('Learned prior, H=5', (210 / 255, 100 / 255, 255 / 255), '-', './simulation_results/results_learned_prior_H5.pickle'),
     ]
 
     fig_st = plt.figure(1, figsize=(6, 2.5))
@@ -51,9 +50,9 @@ def goal_vs_rewards():
 
 def phase_portraits_goal_vs_rewards():
     models = [
-        ('Given prior, H=10', 'model_given_prior_H10.pt', 'settings_given_prior_H10.pk'),
-        ('Given prior, H=15', 'model_given_prior_H15.pt', 'settings_given_prior_H15.pk'),
-        ('Learned prior, H=5', 'model_learned_prior_H5.pt', 'settings_learned_prior_H5.pk'),
+        ('Given prior, H=10', './simulation_results/model_given_prior_H10.pt', './settings_given_prior_H10.json'),
+        ('Given prior, H=15', './simulation_results/model_given_prior_H15.pt', './settings_given_prior_H15.json'),
+        ('Learned prior, H=5', './simulation_results/model_learned_prior_H5.pt', './settings_learned_prior_H5.json'),
     ]
 
     fig = plt.figure(figsize=(8, 2.4))
@@ -61,16 +60,19 @@ def phase_portraits_goal_vs_rewards():
     for i, (model_name, model_file, settings_file) in enumerate(models):
         axis = fig.add_subplot(1, 3, i + 1)
 
-        with open(os.path.join(settings_file), 'rb') as f:
-            settings = pickle.load(f)
+        args = Args(settings=settings_file,
+                    load_existing=True,
+                    save_dirpath='',
+                    model_load_filepath=model_file)
+        settings = args_to_simulation_settings(args)
+        settings['simulation']['episode_callbacks'] = [lambda agent, episode_history, observations_mapper, **kwargs: _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper, label_cbar=i == 2, show_t_goal=True)]
+        settings['simulation']['episodes'] = 1
+        settings['simulation']['train_parameters'] = False
 
         # Run an episode and plot the phase portrait onto the axis
         run_training(
-            **settings,
-            episode_callbacks=[lambda agent, episode_history, observations_mapper, **kwargs: _plot_phase_portrait(fig, axis, agent, episode_history, observations_mapper, label_cbar=i==2, show_t_goal=True)],
-            display_simulation=False,
-            train_parameters=False,
-            model_load_filepath=model_file,
+            settings['agent'],
+            **settings['simulation'],
         )
 
         axis.set_title(model_name)
@@ -86,8 +88,8 @@ def phase_portraits_goal_vs_rewards():
 
 def clean_vs_noise():
     results = [
-        ('Learned prior, H=5', (0.3, 0.5, 1.0), '-', 'results_learned_prior_H5.pickle'),
-        ('Learned prior, H=5, with noise', (0.8, 0.3, 0.3), '--', 'results_learned_prior_H5_noise.pickle')
+        ('Learned prior, H=5', (0.3, 0.5, 1.0), '-', './simulation_results/results_learned_prior_H5.pickle'),
+        ('Learned prior, H=5, with noise', (0.8, 0.3, 0.3), '--', './simulation_results/results_learned_prior_H5_noise.pickle')
     ]
 
     fig = plt.figure(1, figsize=(8, 2.1))
@@ -128,10 +130,8 @@ def clean_vs_noise():
 
 
 def observations_and_policy_noise():
-    model_file = 'model_learned_prior_H5_noise.pt'
-    settings_file = 'settings_learned_prior_H5_noise.pk'
-    with open(os.path.join(settings_file), 'rb') as f:
-        settings = pickle.load(f)
+    model_file = './simulation_results/model_learned_prior_H5_noise.pt'
+    settings_file = 'settings_learned_prior_H5_noise.json'
 
     fig = plt.figure(figsize=(7, 6))
     gs = fig.add_gridspec(7, 1)
@@ -144,17 +144,23 @@ def observations_and_policy_noise():
 
         # 1) Plot actions and states
         _plot_observations_actions(ax_obs, agent, merged_history)
-        ax_obs.set_title(f'Observations and policy. Learned prior, H=5, noise std={settings["observation_noise_std"]}')
+        ax_obs.set_title(f'Observations and policy. Learned prior, H=5, noise std={settings["simulation"]["observation_noise_std"]}')
         _plot_latent_prediction(ax_lat1, 0, merged_history)
         _plot_latent_prediction(ax_lat2, 1, merged_history)
 
+    args = Args(settings=settings_file,
+                load_existing=True,
+                save_dirpath='',
+                model_load_filepath=model_file)
+    settings = args_to_simulation_settings(args)
+    settings['simulation']['episode_callbacks'] = [make_plot]
+    settings['simulation']['episodes'] = 1
+    settings['simulation']['train_parameters'] = False
+
     # Run an episode and plot the phase portrait onto the axis
     stats = run_training(
-        **settings,
-        episode_callbacks=[make_plot],
-        display_simulation=False,
-        train_parameters=False,
-        model_load_filepath=model_file,
+        settings['agent'],
+        **settings['simulation'],
     )
 
     ax_obs.set_xlim((0, 1.5 * stats.select_features(['steps_per_episode'])[1][-1]))
@@ -169,10 +175,10 @@ def observations_and_policy_noise():
 
 def ablation_study():
     results = [
-        ('Full model', (152/255, 57/255, 253/255), '-', 'results_learned_prior_H5.pickle'),
-        ('Only intrinsic term', (203/255, 161/255, 39/255), (0, (5, 1)), 'results_learned_prior_H5_only_intrinsic.pickle'),
-        ('Only extrinsic term', (244/255, 24/255, 70/255), 'dotted', 'results_learned_prior_H5_only_extrinsic.pickle'),
-        ('Only extrinsic term, 25-trial hot start', (80/255, 181/255, 255/255), '-.', 'results_learned_prior_H5_only_extrinsic_hotstart25.pickle')
+        ('Full model', (152 / 255, 57 / 255, 253 / 255), '-', './simulation_results/results_learned_prior_H5.pickle'),
+        ('Only intrinsic term', (203 / 255, 161 / 255, 39 / 255), (0, (5, 1)), './simulation_results/results_learned_prior_H5_only_intrinsic.pickle'),
+        ('Only extrinsic term', (244 / 255, 24 / 255, 70 / 255), 'dotted', './simulation_results/results_learned_prior_H5_only_extrinsic.pickle'),
+        ('Only extrinsic term, 25-trial hot start', (80 / 255, 181 / 255, 255 / 255), '-.', './simulation_results/results_learned_prior_H5_only_extrinsic_hotstart25.pickle'),
     ]
 
     fig_st = plt.figure(1, figsize=(6, 2.5))

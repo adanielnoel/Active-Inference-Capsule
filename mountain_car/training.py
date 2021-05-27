@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import pickle
 
 import gym
@@ -8,16 +9,54 @@ import torch.distributions as distr
 import numpy as np
 import tqdm
 
-from models.vae_dense_obs import DenseObservation_VAE
 from models.active_inference_capsule import ActiveInferenceCapsule
-from models.prior_model import PriorModelBellman
 from utils.timeline import Timeline
 from utils.value_map import ValueMap
 from utils.model_saving import load_capsule_parameters
+from models.vae_dense_obs import DenseObservation_VAE
+from models.prior_model import PriorModelBellman
 import mountain_car.plotting as plots
 
 
-# Note: scroll to bottom for running as script
+def args_to_simulation_settings(args):
+    with open(args.settings, 'r') as f:
+        settings = json.load(f)
+
+    if 'PriorModelBellman' in settings['agent']['prior_model']:
+        prior_model = PriorModelBellman(**settings['agent']['prior_model']['PriorModelBellman'])
+    elif 'Normal' in settings['agent']['prior_model']:
+        prior_model = distr.Normal(torch.tensor(settings['agent']['prior_model']['Normal']['loc']), torch.tensor(settings['agent']['prior_model']['Normal']['std']))
+    else:
+        raise KeyError("Unknown prior_model. Make sure it's either PriorModelBellman or Normal")
+
+    settings['agent']['prior_model'] = prior_model
+    settings['agent']['vae'] = DenseObservation_VAE(**settings['agent']['vae'])
+    settings['simulation']['episode_callbacks'] = [plots.show_phase_portrait, plots.show_prediction_vs_outcome] if args.display_plots else []
+    if args.load_existing:
+        if args.model_load_filepath != '':
+            filepath = args.model_load_filepath
+        else:
+            filepath = os.path.join(args.save_dirpath, f'model_{settings["experiment_name"]}.pt')
+
+        if os.path.exists(filepath):
+            settings['simulation']['model_load_filepath'] = filepath
+        else:
+            raise FileNotFoundError(f'Previous model <{filepath}> not found.')
+    else:
+        settings['simulation']['model_load_filepath'] = None
+    settings['simulation']['save_dirpath'] = None if args.save_dirpath == '' else args.save_dirpath
+    settings['simulation']['model_name'] = settings['experiment_name']
+    settings['simulation']['save_all_episodes'] = args.save_all_episodes
+    settings['simulation']['verbose'] = args.verbose
+    settings['simulation']['display_simulation'] = args.display_simulation
+    return settings
+
+
+def make_model_filepath(dirpath, name, instance=None, episode=None):
+    return os.path.join(dirpath, "model_{}{}{}.pt".format(name,
+                                                          f"_id{instance}" if instance is not None else '',
+                                                          f"_ep{episode:03d}" if episode is not None else ''))
+
 
 def run_training(agent_parameters,  # Agent parameters
                  time_compression,  # Simulation parameter
@@ -29,6 +68,7 @@ def run_training(agent_parameters,  # Agent parameters
                  episode_callbacks=(),  # Job setting
                  frame_callbacks=(),  # Job setting
                  save_dirpath=None,  # Job setting
+                 model_name='',
                  model_load_filepath=None,  # Job setting
                  save_all_episodes=False,  # Job setting
                  load_vae=True,  # Job setting
@@ -44,22 +84,6 @@ def run_training(agent_parameters,  # Agent parameters
     rewards_mapper = ValueMap(in_min=-100, in_max=100, out_min=-1, out_max=1)
     aif_agent = ActiveInferenceCapsule(**agent_parameters)
 
-    if save_dirpath is not None:
-        # Create directory if it doesn't exist
-        if not os.path.exists(save_dirpath):
-            os.makedirs(save_dirpath)
-        model_save_filepath = os.path.join(save_dirpath, f'model{model_id or ""}.pt')
-
-        # Save agent and simulation configuration
-        with open(os.path.join(save_dirpath, f'settings{model_id or ""}.pk'), 'wb') as f:
-            pickle.dump(dict(agent_parameters=agent_parameters,
-                             time_compression=time_compression,
-                             observation_noise_std=observation_noise_std,
-                             include_cart_velocity=include_cart_velocity,
-                             model_id=model_id), f)
-    else:
-        model_save_filepath = None
-
     # Load previous model
     if model_load_filepath is not None:
         load_capsule_parameters(aif_agent, model_load_filepath, load_vae, load_transition_model, load_prior_model)
@@ -71,7 +95,8 @@ def run_training(agent_parameters,  # Agent parameters
             print(f"\nLoaded <{', '.join(loaded_models)}> from previous save at <{model_load_filepath}>")
 
     if save_dirpath is not None and train_parameters:
-        torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_000.pt'))
+        # save episode 0
+        torch.save(aif_agent.state_dict(), make_model_filepath(save_dirpath, model_name, model_id, 0 if save_all_episodes else None))
 
     use_kl_intrinsic = aif_agent.use_kl_intrinsic
     use_kl_extrinsic = aif_agent.use_kl_extrinsic
@@ -125,7 +150,7 @@ def run_training(agent_parameters,  # Agent parameters
                                 frame=frame))
 
             if done:
-                if i % time_compression != 0:   # if last state did not fall in the update, update anyways
+                if i % time_compression != 0:  # if last state did not fall in the update, update anyways
                     aif_agent.step(t, obs_noise if include_cart_velocity else obs_noise[[0]], action=None, reward=reward)
                 iterator.set_postfix_str(f'reward={total_reward:.2f}')
                 break
@@ -140,7 +165,7 @@ def run_training(agent_parameters,  # Agent parameters
                             observations_mapper=observations_mapper))
 
         if save_dirpath is not None and train_parameters:
-            torch.save(aif_agent.state_dict(), model_save_filepath if not save_all_episodes else os.path.join(save_dirpath, f'model{model_id or ""}_{episode + 1:03d}.pt'))
+            torch.save(aif_agent.state_dict(), make_model_filepath(save_dirpath, model_name, model_id, episode if save_all_episodes else None))
         VFE, expected_FEEF = aif_agent.logged_history.select_features(['VFE', 'expected_FEEF'])[1]
         training_history.log(episode, 'cumulative_VFE', sum(VFE).item())
         training_history.log(episode, 'cumulative_FEEF', sum(expected_FEEF).item())
@@ -149,64 +174,3 @@ def run_training(agent_parameters,  # Agent parameters
 
     env.close()
     return training_history
-
-
-if __name__ == '__main__':
-    _display_plots = False
-    _load_existing = False
-    experiment_dir = './experiments/single_run/'
-    _learn_prior_model = True
-    _include_cart_velocity = True
-    _observation_noise_std = 0.1
-    _time_compression = 3
-    _planning_horizon = 10  # Multiply with _time_compression to get in simulation steps
-
-    if _learn_prior_model:
-        prior_model = PriorModelBellman(observation_dim=2 if _include_cart_velocity else 1, learning_rate=0.1, iterate_train=15, discount_factor=0.995)
-    else:
-        prior_model = distr.Normal(torch.tensor([0.9, 0.0]) if _include_cart_velocity else 0.9, 1.0)
-
-    from time import time
-
-    t0 = time()
-    res = run_training(
-        agent_parameters=dict(
-            vae=DenseObservation_VAE(
-                observation_dim=2 if _include_cart_velocity else 1,
-                latent_dim=2 if _include_cart_velocity else 1,
-                observation_noise_std=_observation_noise_std),
-            prior_model=prior_model,
-            policy_dim=1,
-            time_step_size=_time_compression,
-            planning_horizon=_planning_horizon,
-            n_policy_samples=700,
-            policy_iterations=2,
-            n_policy_candidates=70,
-            action_window=1,
-            # use_kl_intrinsic=False,  # Uncomment for ablation study
-            # use_kl_extrinsic=False   # Uncomment for ablation study
-        ),
-        time_compression=_time_compression,
-        episodes=200,
-        observation_noise_std=_observation_noise_std,
-        include_cart_velocity=_include_cart_velocity,
-        model_id=None,
-        # hot_start_episodes=10,
-        episode_callbacks=[plots.show_phase_portrait, plots.show_prediction_vs_outcome] if _display_plots else [],
-        frame_callbacks=(),
-        save_dirpath=experiment_dir,
-        save_all_episodes=False,
-        model_load_filepath='./experiments/single_run/model.pt' if _load_existing else None,
-        load_vae=True,
-        load_transition_model=True,
-        load_prior_model=True,
-        train_parameters=True,
-        verbose=True,
-        display_simulation=False
-    )
-
-    print(f'Finished {len(res.times)} episodes in {time() - t0:.1f} seconds')
-    plots.plot_cumulative_free_energies(res)
-    # with open(os.path.join(experiment_dir, 'results.pickle'), 'wb') as f:
-    #     pickle.dump(res, f)
-    # plots.plot_training_history(res, save_path=os.path.join(experiment_dir, 'run_stats.pdf'), show=True)
