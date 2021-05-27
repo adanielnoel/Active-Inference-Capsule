@@ -3,6 +3,11 @@ from collections.abc import Iterable
 from collections import defaultdict
 
 
+"""
+Utility class for logging time-series data and doing some handy operations with it
+"""
+
+
 class Timeline:
     def __init__(self, time_max_decimals=5):
         self.tml = defaultdict(dict)

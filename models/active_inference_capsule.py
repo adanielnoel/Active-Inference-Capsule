@@ -12,12 +12,11 @@ from utils.timeline import Timeline
 
 class ActiveInferenceCapsule(nn.Module):
     """
-    Learns observation, transition and prior  models, and
+    Learns the observation (VAE), transition and prior models, and
     generates policies with minimal Free Energy of the Expected Future [1].
 
     Use:
-        Call step() at every time-step. The function returns the action to take next.
-        If using a learned prior, call learn_prior_model() when the goal is reached.
+        Call step() at every time-step. The method returns the action to take next.
 
     References:
         - [1] B. Millidge et al, “Whence the Expected Free Energy?,” 2020, doi: 10.1162/neco_a_01354.
@@ -179,7 +178,7 @@ class ActiveInferenceCapsule(nn.Module):
         return kl_extrinsic
 
     def _forward_policies(self, policies: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor):
-        """Forward propagate a batch of policies in time and compute their FEEFs
+        """Forward-propagate a batch of policies in time and compute their FEEFs
         Note:
             policies.shape = [planning_horizon, n_policies, policy_dim]
 
@@ -207,9 +206,9 @@ class ActiveInferenceCapsule(nn.Module):
     def sample_policy(self):
         """
         Implementation of the Cross Entropy Method.
-        Similarly as done in [1].
+        Similarly as done in [2].
         References:
-            [1] Tschantz, A., Millidge, B., Seth, A. K., & Buckley, C. L. (2020). Reinforcement Learning through Active Inference. ArXiv. http://arxiv.org/abs/2002.12636
+            [2] Tschantz, A., Millidge, B., Seth, A. K., & Buckley, C. L. (2020). Reinforcement Learning through Active Inference. ArXiv. http://arxiv.org/abs/2002.12636
         """
 
         mean_best_policies = torch.zeros([self.planning_horizon, self.policy_dim])
@@ -242,8 +241,3 @@ class ActiveInferenceCapsule(nn.Module):
         qx_y.loc.detach_()
         qx_y.scale.detach_()
         return VFE.detach(), qx_y
-
-    # def learn_prior_model(self, reward):
-    #     if not isinstance(self.prior_model, distr.Distribution):
-    #         _, po = self.logged_history.select_features('perceived_observations')
-    #         self.prior_model.learn(torch.stack(po), reward)

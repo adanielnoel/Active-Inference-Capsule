@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.distributions as distr
 import torch.optim as optim
 
 from models.vae import VAE

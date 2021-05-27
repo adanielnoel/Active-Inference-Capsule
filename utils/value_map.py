@@ -1,6 +1,11 @@
 import torch.nn as nn
 
 
+"""
+Maps a value from a range onto another
+"""
+
+
 class ValueMap(nn.Module):
     def __init__(self, in_min, in_max, out_min, out_max):
         super(ValueMap, self).__init__()

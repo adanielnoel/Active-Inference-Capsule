@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import pickle
 
 import gym
 import torch
@@ -58,25 +57,25 @@ def make_model_filepath(dirpath, name, instance=None, episode=None):
                                                           f"_ep{episode:03d}" if episode is not None else ''))
 
 
-def run_training(agent_parameters,  # Agent parameters
-                 time_compression,  # Simulation parameter
-                 observation_noise_std=None,  # Simulation parameter
-                 include_cart_velocity=True,  # Simulation parameter
-                 model_id=None,  # Simulation parameter - use to manage multiple independent models in the same folder
-                 hot_start_episodes=0,  # Simulation parameter
-                 episodes=1,  # Job setting
-                 episode_callbacks=(),  # Job setting
-                 frame_callbacks=(),  # Job setting
-                 save_dirpath=None,  # Job setting
+def run_training(agent_parameters,
+                 time_compression,
+                 observation_noise_std=None,
+                 include_cart_velocity=True,
+                 model_id=None,
+                 hot_start_episodes=0,
+                 episodes=1,
+                 episode_callbacks=(),
+                 frame_callbacks=(),
+                 save_dirpath=None,
                  model_name='',
-                 model_load_filepath=None,  # Job setting
-                 save_all_episodes=False,  # Job setting
-                 load_vae=True,  # Job setting
-                 load_transition_model=True,  # Job setting
-                 load_prior_model=True,  # Job setting
-                 train_parameters=True,  # Job setting
-                 verbose=True,  # Job setting
-                 display_simulation=False):  # Job setting
+                 model_load_filepath=None,
+                 save_all_episodes=False,
+                 load_vae=True,
+                 load_transition_model=True,
+                 load_prior_model=True,
+                 train_parameters=True,
+                 verbose=True,
+                 display_simulation=False):
 
     env = gym.make('MountainCarContinuous-v0').env
     observations_mapper = ValueMap(in_min=torch.tensor((-1.2, -0.07)), in_max=torch.tensor((0.6, 0.07)),
@@ -95,8 +94,7 @@ def run_training(agent_parameters,  # Agent parameters
             print(f"\nLoaded <{', '.join(loaded_models)}> from previous save at <{model_load_filepath}>")
 
     if save_dirpath is not None and train_parameters:
-        # save episode 0
-        torch.save(aif_agent.state_dict(), make_model_filepath(save_dirpath, model_name, model_id, 0 if save_all_episodes else None))
+        torch.save(aif_agent.state_dict(), make_model_filepath(save_dirpath, model_name, model_id, 0 if save_all_episodes else None)) # save episode 0 (no training yet)
 
     use_kl_intrinsic = aif_agent.use_kl_intrinsic
     use_kl_extrinsic = aif_agent.use_kl_extrinsic

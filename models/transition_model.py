@@ -7,7 +7,7 @@ import torch.autograd.profiler as profiler
 
 class PredictorGRU(nn.Module):
     """
-    Predictor model for latent state sequences under a policy (i.e., a sequence of control actions)
+    Predictor model for latent state sequences conditioned on a policy (i.e., a sequence of control actions)
 
     Args:
         latent_dim: number of dimensions of the latent space
@@ -18,6 +18,7 @@ class PredictorGRU(nn.Module):
 
     def __init__(self, latent_dim: int, policy_dim: int, dynamic_dim: int, num_rnn_layers: int):
         super(PredictorGRU, self).__init__()
+        # Hyperparameters
         self.latent_dim = latent_dim
         self.policy_dim = policy_dim
         self.dynamic_dim = dynamic_dim
@@ -55,7 +56,6 @@ class PredictorGRU(nn.Module):
         :param policy: [sequence_length, n_policies, policy_dim]
         :return: the mean and standard deviation of the predicted latents
         """
-
         steps, n_policies = policy.shape[:2]
         next_mu = []
         next_var = []

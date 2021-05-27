@@ -1,6 +1,10 @@
 import torch
 import torch.distributions
 
+"""
+Utility class to selectively load parts of the model
+"""
+
 
 def save(model, model_save_filepath):
     torch.save(model.state_dict(), model_save_filepath)
