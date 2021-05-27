@@ -17,7 +17,7 @@ Repository for the paper **Online reinforcement learning with sparse rewards thr
 
 ## Training a single agent
 ```
-> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/'
+python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/'
 ```
 This will train a single agent and save the model in `./paper_results/simulation_results/`
 
@@ -27,7 +27,7 @@ Note: the folder `./paper_results/simulation_results/` already contains the resu
 
 ## Training a batch of agents
 ```
-> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --batch_agents=30
+python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --batch_agents=30
 ```
 This will train 30 agents and save the models and training statistics in `./paper_results/simulation_results/`
 
@@ -39,7 +39,7 @@ The results can be visualized using the script `./mountain_car/plot_multiple_tra
 First, train a single agent. With the option `--save_all_episodes=True` when training the single agent, the model is saved per episode instead of overriding the latest one. This facilitates making videos of different episodes of the same agent.
 
 ```
-> python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --make_video=True --model_load_filepath='./paper_results/simulation_results/model_learned_prior_H5.pt'
+python run_capsule_mountain_car.py --settings='./paper_results/settings_learned_prior_H5.json' --save_dirpath='./paper_results/simulation_results/' --make_video=True --model_load_filepath='./paper_results/simulation_results/model_learned_prior_H5.pt'
 ```
 
 This will start saving individual frames in a subdirectory of `save_dirpath`. When the agent reaches the goal, it will call `ffmpeg` to generate a `.mp4` file.
