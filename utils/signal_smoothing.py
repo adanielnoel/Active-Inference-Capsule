@@ -1,6 +1,7 @@
 import numpy
 
 # Code from https://scipy-cookbook.readthedocs.io/items/SignalSmooth.html
+# Used for smoothing plots
 
 
 def smooth(x, window_len=0, window='hanning'):

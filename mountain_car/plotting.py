@@ -98,15 +98,14 @@ def _plot_phase_portrait(fig, axis, agent: ActiveInferenceCapsule, episode_histo
                 else:
                     kl_extrinsic[i, j] = agent.kl_extrinsic(torch.stack((sample_positions[j], sample_velocities[i]))).sum()
 
-    kl_bar_max = 1.0 if kl_extrinsic.max() < 1.5 else 2.0
-    clev = torch.linspace(0.0, max(kl_bar_max, kl_extrinsic.max().item()), 100)
+    clev = torch.linspace(0.0, max(2.0, kl_extrinsic.max().item()), 100)
     cs = axis.contourf(sample_positions.expand((grid_points, grid_points)), sample_velocities.expand((grid_points, grid_points)).transpose(1, 0), kl_extrinsic, clev, cmap='magma_r')
     for c in cs.collections:
         c.set_rasterized(True)
 
     divider = make_axes_locatable(axis)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(cs, cax=cax, ticks=torch.linspace(0.0, kl_bar_max, 5))
+    cbar = fig.colorbar(cs, cax=cax, ticks=torch.arange(0.0, 2.01, 0.5))
     if label_cbar:
         cbar.set_label('KL extr.')
 
