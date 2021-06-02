@@ -30,6 +30,7 @@ parser.add_argument("--model_load_filepath", type=str, default='')
 parser.add_argument("--save_all_episodes", type=bool, default=False)
 parser.add_argument("--verbose", type=bool, default=True)
 parser.add_argument("--display_simulation", type=bool, default=False)
+parser.add_argument("--video_with_dashboard", type=bool, default=False)
 args = parser.parse_args()
 args.load_existing = args.make_video or args.load_existing # make sure we are loading a model when making a video
 settings = args_to_simulation_settings(args)
@@ -96,11 +97,18 @@ def make_video():
 
     # Callback function to draw each episode frame
     def save_video_frame(agent, episode_history, observations_mapper, frame, **kwargs):
-        fig = plots.make_video_frame(agent, episode_history, frame, observations_mapper)
-        match = re.search(r'_ep(\d*).pt', settings['simulation']['model_load_filepath'])
-        if match:  # the model contains the episode number
-            fig.subplots_adjust(top=0.88)
-            fig.suptitle(f'Episode {int(match.group(1))}', y=0.98)
+        if args.video_with_dashboard:
+            fig = plots.make_video_frame(agent, episode_history, frame, observations_mapper)
+            match = re.search(r'_ep(\d*).pt', settings['simulation']['model_load_filepath'])
+            if match:  # the model contains the episode number
+                fig.subplots_adjust(top=0.88)
+                fig.suptitle(f'Episode {int(match.group(1))}', y=0.98)
+        else:
+            fig = plt.figure(figsize=(6, 4))
+            fig.gca().imshow(frame)
+            fig.gca().get_xaxis().set_visible(False)
+            fig.gca().get_yaxis().set_visible(False)
+            fig.tight_layout()
         fig.savefig(os.path.join(frames_path, f'frame_{len(episode_history.times):04d}.png'), dpi=200)
         plt.close(fig)
 
